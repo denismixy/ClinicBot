@@ -58,18 +58,18 @@ db.connect()
 
 
 # add client into DB
-def add_client(person):
+def add_client(person) -> None:
   Clients.create(client_id=person.client_id, name=person.name, birthday=person.birthday, tel_num=person.tel_num, other_info=person.other_info)
 
 
-def check_client_info(id):
+def check_client_info(id: int) -> bool:
   try:
     client = Clients.get(Clients.client_id == id)
     return True
   except(Exception):
     return False
 
-def check_client_note(id):
+def check_client_note(id: int) -> bool:
   try:
     note = AppointmentsList.get(AppointmentsList.client_id == id)
     return True
@@ -79,7 +79,7 @@ def check_client_note(id):
 
 
 # show client info
-def show_client_info(id):
+def show_client_info(id: int) -> str:
   client = Clients.get(Clients.client_id == id)
   output = "Подтвердите свои данные:\n"
   output += f"Ваше имя: {client.name}\n"
@@ -89,7 +89,7 @@ def show_client_info(id):
   return output
 
 
-def show_client_note(id):
+def show_client_note(id: int) -> str:
   try:
     note = AppointmentsList.get(AppointmentsList.client_id == id)
     client = Clients.get(Clients.client_id == note.client_id)
@@ -102,14 +102,13 @@ def show_client_note(id):
   except(Exception):
     return 'О вас нет никакой информации'
 
-def add_note(data):
+def add_note(data) -> None:
   AppointmentsList.create(client_id=data[0], doctor_id=Doctors.get(Doctors.name == data[1]), date_and_time=data[2] + ' ' + data[3])
 
 
 
-def show_doctors():
+def show_doctors() -> list:
   output = []
   for doctor in Doctors.select():
-    print(doctor.name)
     output.append(doctor.name)
   return output
