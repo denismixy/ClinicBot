@@ -25,8 +25,8 @@ def switch(message: types.Message) -> None:
             bot.send_message(message.chat.id, database.show_client_note(message.from_user.id))
             start_menu(message)
             # дополнить
-    except Exception as e:
-        print(str(e))
+    except (Exception):
+        print(str(Exception))
  
  
 def appointments(message: types.Message) -> None:
