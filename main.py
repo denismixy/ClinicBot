@@ -2,26 +2,29 @@ import datetime
 import telebot
 from telebot import types
 import database
+import config
 
-bot = telebot.TeleBot('')
+bot = telebot.TeleBot(config.bottoken)
 
 @bot.message_handler(commands=["start"])
 def welcome(message):
+  bot.send_message(message.chat.id, "Добро пожаловать в нашу клинику")
+  start_menu(message)
+
+def start_menu(message):
     keyBoard = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
     keyBoard.add(telebot.types.KeyboardButton(text="Записаться"), telebot.types.KeyboardButton(text="Посмотреть запись"))
-    msg = bot.send_message(message.chat.id, "Добро пожаловать в нашу клинику", reply_markup=keyBoard)
-    print(msg.text)
+    msg = bot.send_message(message.chat.id, "Выберите пункт", reply_markup=keyBoard)
     bot.register_next_step_handler(msg, switch)
  
  
 def switch(message):
     try:
-        chat_id = message.chat.id
         if message.text == "Записаться":
             appointments(message.chat.id)
         elif message.text == "Посмотреть запись":
             bot.send_message(message.chat.id, database.show_client_note(message.from_user.id))
-            welcome(message)
+            start_menu(message)
             # дополнить
     except Exception as e:
         print(str(e))
@@ -38,30 +41,35 @@ def appointments(chat_id):
 def switchAppointments(message):
     chat_id = message.chat.id
     if message.text == "Я знаю своего врача":
-        doctor_appointments(chat_id)
+        doctor_appointments(message)
     else:
-        datetime_appointments(chat_id)
+        datetime_appointments(message)
  
 
 # Выбор врача, даты и времени 
-def doctor_appointments(chat_id):
+def doctor_appointments(message):
   choice_made = []
 
-  def choose_doctor(chat_id):
+  if database.check_client_note(message.from_user.id):
+    bot.send_message(message.chat.id, 'Вы уже записаны')
+    start_menu(message)
+    return
+
+  def choose_doctor(message):
     doctors = database.show_doctors()
     keyBoard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     for name in doctors:
       keyBoard.add(name)
-    msg = bot.send_message(chat_id, 'Choose a doctor', reply_markup=keyBoard)
+    msg = bot.send_message(message.chat.id, 'Выберите врача', reply_markup=keyBoard)
     bot.register_next_step_handler(msg, choose_day)
 
   def choose_day(message):
     chat_id = message.chat.id
-    days = ['Mon', 'Tue', 'Wed'] # select from DB ERROR
+    days = ['01.10', '02.10', '03.10', '04.10', '05.10'] # select from DB ERROR
     keyBoard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     for day in days:
       keyBoard.add(day)
-    msg = bot.send_message(chat_id, 'Choose a day', reply_markup=keyBoard)
+    msg = bot.send_message(chat_id, 'Выберите день приема', reply_markup=keyBoard)
     choice_made.append(message.from_user.id)
     choice_made.append(message.text)
     bot.register_next_step_handler(msg, choose_time)
@@ -74,7 +82,7 @@ def doctor_appointments(chat_id):
       keyBoard.add(hour)
     #choice_made.append(msg)
     choice_made.append(message.text)
-    msg = bot.send_message(chat_id, 'Choose a hour', reply_markup=keyBoard)
+    msg = bot.send_message(chat_id, 'Выберите время приема', reply_markup=keyBoard)
     bot.register_next_step_handler(msg, send_database)
 
   def send_database(message):
@@ -85,32 +93,37 @@ def doctor_appointments(chat_id):
     data_input(message)
 
 
-  choose_doctor(chat_id)
+  choose_doctor(message)
 
 # Ввод данных пользователя  
 def data_input(message):
   client = Client(message.from_user.id)
+  if database.check_client_info(message.from_user.id):
+    bot.send_message(message.chat.id, database.show_client_info(message.from_user.id))
+    bot.send_message(message.chat.id, 'Запись на прием успешно завершена')
+    start_menu(message)
+    return
 
   def input_name(message):
     chat_id = message.chat.id
-    msg = bot.send_message(chat_id, 'Input FIO')
+    msg = bot.send_message(chat_id, 'Введите ФИО')
     bot.register_next_step_handler(msg, input_birthday)
 
   def input_birthday(message):
     chat_id = message.chat.id
-    msg = bot.send_message(chat_id, 'Input birthday')
+    msg = bot.send_message(chat_id, 'Введите день рождения')
     client.name = message.text
     bot.register_next_step_handler(msg, input_telnumber)
 
   def input_telnumber(message):
     chat_id = message.chat.id
-    msg = bot.send_message(chat_id, 'Input telnum')
+    msg = bot.send_message(chat_id, 'Введите тел. номер')
     client.birthday = message.text
     bot.register_next_step_handler(msg, input_otherinfo)
 
   def input_otherinfo(message):
     chat_id = message.chat.id
-    msg = bot.send_message(chat_id, 'Input other info')
+    msg = bot.send_message(chat_id, 'Введите доп. инфо')
     client.tel_num = message.text
     bot.register_next_step_handler(msg, send_client_info)
 
@@ -123,7 +136,7 @@ def data_input(message):
   input_name(message)
  
  
-def datetime_appointments(chat_id):
+def datetime_appointments(message):
     pass
 
 

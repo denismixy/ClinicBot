@@ -3,7 +3,7 @@ import peewee
 import datetime
 from peewee import *
 
-db = SqliteDatabase('hospital.db')
+db = SqliteDatabase('clinic.db')
 
 
 class Clients(Model):
@@ -62,18 +62,32 @@ def add_client(person):
   Clients.create(client_id=person.client_id, name=person.name, birthday=person.birthday, tel_num=person.tel_num, other_info=person.other_info)
 
 
+def check_client_info(id):
+  try:
+    client = Clients.get(Clients.client_id == id)
+    return True
+  except(Exception):
+    return False
+
+def check_client_note(id):
+  try:
+    note = AppointmentsList.get(AppointmentsList.client_id == id)
+    return True
+  except(Exception):
+    return False
+
+
+
 # show client info
-# def show_client_info(id):
-#   try:
-#     client = Clients.get(Clients.client_id == id)
-#     output = ""
-#     output += f"Ваше имя: {client.name}\n"
-#     output += f"Ваше д\р: {client.birthday}\n"
-#     output += f"Ваш телефон: {client.tel_num}\n"
-#     output += f"Доп. инфо: {client.other_info}"
-#     return output
-#   except(Exception):
-#     return 'О вас нет никакой информации'
+def show_client_info(id):
+  client = Clients.get(Clients.client_id == id)
+  output = "Подтвердите свои данные:\n"
+  output += f"Ваше имя: {client.name}\n"
+  output += f"Ваше д\р: {client.birthday}\n"
+  output += f"Ваш телефон: {client.tel_num}\n"
+  output += f"Доп. инфо: {client.other_info}"
+  return output
+
 
 def show_client_note(id):
   try:
@@ -96,5 +110,6 @@ def add_note(data):
 def show_doctors():
   output = []
   for doctor in Doctors.select():
+    print(doctor.name)
     output.append(doctor.name)
   return output
