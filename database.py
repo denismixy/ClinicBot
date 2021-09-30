@@ -101,8 +101,8 @@ def show_client_note(id: int) -> str:
     except(Exception):
         return 'О вас нет никакой информации'
 
-def add_note(data) -> None:
-    AppointmentsList.create(client_id=data[0], doctor_id=Doctors.get(Doctors.name == data[1]), date_and_time=data[2] + ' ' + data[3])
+def add_note(note) -> None:
+    AppointmentsList.create(client_id=note.client_id, doctor_id=Doctors.get(Doctors.name == note.doctor), date_and_time=note.date + ' ' + note.hour)
 
 
 
