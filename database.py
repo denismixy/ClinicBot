@@ -1,6 +1,4 @@
 
-import peewee
-import datetime
 from peewee import *
 
 db = SqliteDatabase('clinic.db')
@@ -64,14 +62,14 @@ def add_client(person) -> None:
 
 def check_client_info(id: int) -> bool:
     try:
-        client = Clients.get(Clients.client_id == id)
+        Clients.get(Clients.client_id == id)
         return True
     except(Exception):
         return False
 
 def check_client_note(id: int) -> bool:
     try:
-        note = AppointmentsList.get(AppointmentsList.client_id == id)
+        AppointmentsList.get(AppointmentsList.client_id == id)
         return True
     except(Exception):
         return False
@@ -102,8 +100,7 @@ def show_client_note(id: int) -> str:
         return 'О вас нет никакой информации'
 
 def add_note(note) -> None:
-    AppointmentsList.create(client_id=note.client_id, doctor_id=Doctors.get(Doctors.name == note.doctor), date_and_time=note.date + ' ' + note.hour)
-
+    AppointmentsList.create(client_id=note['client_id'], doctor_id=Doctors.get(Doctors.name == note['doctor']), date_and_time=note['date']+ ' ' + note['time'])
 
 
 def show_doctors() -> list:
