@@ -4,27 +4,47 @@ Donate please, NOT LESS 300$
 FUCKING SLAVES
 STICK UR FINGER IN MY ASS
 '''
-
-
-import aiogram.utils.markdown as md
+import re
+import database
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
-from aiogram.types import ParseMode, message
 from aiogram.utils import executor
 
+storage = None
+bot = None
+dp = None
 
-import config, database
 
+def search_property(property_name):
+    pattern = property_name + r' = "(.*)"'
+    result = ""
+    with open("config.txt", "r") as config:
+        for string in config.readlines():
+            if re.search(pattern, string):
+                search_result = re.search(pattern, string)
+                result = search_result.group(1)
+    return result
+
+
+def init_bot():
+    global bot, dp, storage
+    bot = Bot(search_property("bot_token"))
+    storage = MemoryStorage()
+    dp = Dispatcher(bot, storage=storage)
+
+
+init_bot()
 # =============================КЛАССЫ FSM=================================================
+
 
 class Menu(StatesGroup):
     start_menu = State()
-    sign_up = State() 
+    sign_up = State()
     show_appointment = State()
     choose_doctor = State()
+
 
 class Appointment(StatesGroup):
     know_doctor = State()
@@ -33,20 +53,23 @@ class Appointment(StatesGroup):
     set_date = State()
     set_time = State()
 
+
 class ClientInfo(StatesGroup):
-    name = State() 
+    name = State()
     birthday = State()
-    tel_num = State() 
+    tel_num = State()
     other_info = State()
 
 
 # =============================МЕНЮ=================================================
-
+@dp.message_handler(commands='start', state='*')
 async def cmd_start(message: types.Message):
     await message.answer("Добро пожаловать в нашу клинику")
     await Menu.start_menu.set()
     await start_menu(message)
 
+
+@dp.message_handler(state=Menu.start_menu)
 async def start_menu(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = ['Хочу записаться', 'Посмотреть запись']
@@ -56,6 +79,7 @@ async def start_menu(message: types.Message):
     await message.answer("Выберите действие", reply_markup=keyboard)
 
 
+@dp.message_handler(state=Menu.sign_up)
 async def sign_up(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = ['Я знаю врача', 'Я не знаю врача']
@@ -65,13 +89,15 @@ async def sign_up(message: types.Message, state: FSMContext):
     await Menu.choose_doctor.set()
 
 
-async def show_note(message: types.Message): #СДЕЛАТЬ НАДО
+# TODO
+async def show_note(message: types.Message):
     await Menu.show_appointment.set()
     await message.answer('')
 
 
 # ==========================ЗАПИСЬ В ТАБЛИЦУ ЗАПИСЕЙ====================================================
 
+@dp.message_handler(state=Menu.choose_doctor)
 async def switch_doctor(message: types.Message, state: FSMContext):
     if message.text == 'Я знаю врача':
         keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -84,6 +110,8 @@ async def switch_doctor(message: types.Message, state: FSMContext):
         await message.answer('.', reply_markup=keyboard)
         await Appointment.dont_know_doctor.set()
 
+
+@dp.message_handler(state=Appointment.know_doctor)
 async def choose_doctor(message: types.Message, state: FSMContext):
     if database.check_client_note(message.from_user.id):
         await message.answer('Вы уже записаны')
@@ -96,32 +124,39 @@ async def choose_doctor(message: types.Message, state: FSMContext):
     await message.answer('Выберите вашего врача', reply_markup=keyboard)
     await Appointment.set_doctor.set()
 
+
+@dp.message_handler(state=Appointment.set_doctor)
 async def choose_date(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = ['01.10', '02.10', '03.10', '04.10', '05.10', '06.10', '07.10']
     keyboard.add(*buttons)
 
-    await state.update_data(client_id = message.from_user.id)
-    await state.update_data(doctor = message.text)
+    await state.update_data(client_id=message.from_user.id)
+    await state.update_data(doctor=message.text)
 
     await message.answer('Выберите дату', reply_markup=keyboard)
     await Appointment.set_date.set()
 
+
+@dp.message_handler(state=Appointment.set_date)
 async def choose_time(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = ['00:00', '01:00', '02:00', '03:00', '04:00']
     keyboard.add(*buttons)
 
-    await state.update_data(date = message.text)
+    await state.update_data(date=message.text)
     await message.answer('Выберите время', reply_markup=keyboard)
     await Appointment.set_time.set()
 
+
+@dp.message_handler(state=Appointment.set_time)
 async def send_appointment(message: types.Message, state: FSMContext):
-    await state.update_data(time = message.text)
+    await state.update_data(time=message.text)
     database.add_note(await state.get_data())
     await state.reset_data()
     await message.answer('Запись добавлена')
     await cmd_start(message)
+
 
 # =================================КЛАССЫ ОБЪЕКТОВ=============================================
 
@@ -133,31 +168,6 @@ class Client:
         self.tel_num = tel_num
         self.other_info = other_info
 
-# =================================ОБРАБОТЧИКИ=============================================
 
-def register_handlers_menu(dp: Dispatcher):
-    dp.register_message_handler(cmd_start, commands='start', state='*')
-    dp.register_message_handler(start_menu, state=Menu.start_menu)
-    dp.register_message_handler(sign_up, state=Menu.sign_up)
-    dp.register_message_handler(switch_doctor, state=Menu.choose_doctor)
+executor.start_polling(dp)
 
-def register_handlers_appointment(dp: Dispatcher):
-    dp.register_message_handler(choose_doctor, state=Appointment.know_doctor)
-    dp.register_message_handler(choose_date, state=Appointment.set_doctor)
-    dp.register_message_handler(choose_time, state=Appointment.set_date)
-    dp.register_message_handler(send_appointment, state=Appointment.set_time)
-
-# ==============================================================================
-
-def main():
-    bot = Bot(token=config.bottoken)
-
-    storage = MemoryStorage()
-    dp = Dispatcher(bot, storage=storage)
-
-    register_handlers_menu(dp)
-    register_handlers_appointment(dp)
-    
-    executor.start_polling(dp)
-
-main()
