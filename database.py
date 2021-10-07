@@ -55,11 +55,11 @@ db.connect()
 
 # add client into DB
 def add_client(person) -> None:
-    Clients.create(client_id=person.client_id,
-                   name=person.name,
-                   birthday=person.birthday,
-                   tel_num=person.tel_num,
-                   other_info=person.other_info)
+    Clients.create(client_id=person["client_id"],
+                   name=person["name"],
+                   birthday=person["birthday"],
+                   tel_num=person["tel_num"],
+                   other_info=person["other_info"])
 
 
 def check_client_info(id: int) -> bool:
