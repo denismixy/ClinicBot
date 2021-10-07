@@ -62,6 +62,17 @@ def add_client(person) -> None:
                    other_info=person["other_info"])
 
 
+def add_apppointment(note) -> None:
+    AppointmentsList.create(client_id=note['client_id'],
+                            doctor_id=Doctors.get(Doctors.name == note['doctor']),
+                            date_and_time=note['date'] + ' ' + note['time'])
+
+
+def del_appointment(client_id) -> None:
+    note_id = AppointmentsList.get(AppointmentsList.client_id == client_id)
+    AppointmentsList.delete_by_id(note_id.id)
+
+
 def check_client_info(id: int) -> bool:
     try:
         Clients.get(Clients.client_id == id)
@@ -70,7 +81,7 @@ def check_client_info(id: int) -> bool:
         return False
 
 
-def check_client_note(id: int) -> bool:
+def check_client_appointment(id: int) -> bool:
     try:
         AppointmentsList.get(AppointmentsList.client_id == id)
         return True
@@ -89,7 +100,7 @@ def show_client_info(id: int) -> str:
     return output
 
 
-def show_client_note(id: int) -> str:
+def show_client_appointment(id: int) -> str:
     try:
         note = AppointmentsList.get(AppointmentsList.client_id == id)
         client = Clients.get(Clients.client_id == note.client_id)
@@ -101,12 +112,6 @@ def show_client_note(id: int) -> str:
         return output
     except Exception:
         return 'О вас нет никакой информации'
-
-
-def add_note(note) -> None:
-    AppointmentsList.create(client_id=note['client_id'],
-                            doctor_id=Doctors.get(Doctors.name == note['doctor']),
-                            date_and_time=note['date'] + ' ' + note['time'])
 
 
 def show_doctors() -> list:
