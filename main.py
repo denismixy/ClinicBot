@@ -5,42 +5,35 @@ FUCKING SLAVES
 STICK UR FINGER IN MY ASS
 '''
 import re
-import database
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.utils import executor
 
+import database, properties
+
 storage = None
 bot = None
 dp = None
-
-
-def search_property(property_name):
-    pattern = property_name + r' = "(.*)"'
-    result = ""
-    with open("config.txt", "r") as config:
-        for string in config.readlines():
-            if re.search(pattern, string):
-                search_result = re.search(pattern, string)
-                result = search_result.group(1)
-    return result
+property_file = properties.Properties('config.txt')
 
 
 def init_bot():
     global bot, dp, storage
-    bot = Bot(search_property("bot_token"))
+    bot = Bot(property_file.get_property('bot_token'))
     storage = MemoryStorage()
     dp = Dispatcher(bot, storage=storage)
 
 
 init_bot()
+
+
 # =============================КЛАССЫ FSM=================================================
-
-
 class Menu(StatesGroup):
     start_menu = State()
+    keyboard_menu = State()
     sign_up = State()
     show_appointment = State()
     choose_doctor = State()
@@ -52,6 +45,7 @@ class Appointment(StatesGroup):
     set_doctor = State()
     set_date = State()
     set_time = State()
+    add_appointment = State()
 
 
 class ClientInfo(StatesGroup):
@@ -75,12 +69,21 @@ async def start_menu(message: types.Message):
     buttons = ['Хочу записаться', 'Посмотреть запись']
     keyboard.add(*buttons)
 
-    await Menu.sign_up.set()
+    await Menu.keyboard_menu.set()
     await message.answer("Выберите действие", reply_markup=keyboard)
 
 
-@dp.message_handler(state=Menu.sign_up)
-async def sign_up(message: types.Message, state: FSMContext):
+@dp.message_handler(state=Menu.keyboard_menu)
+async def keyboard_menu(message: types.Message, state: FSMContext):
+    if message.text == 'Хочу записаться':
+        await Menu.sign_up.set()
+        await sign_up(message)
+    elif message.text == 'Посмотреть запись':
+        await Menu.show_appointment.set()
+        await show_appointment(message)
+
+
+async def sign_up(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = ['Я знаю врача', 'Я не знаю врача']
     keyboard.add(*buttons)
@@ -89,33 +92,30 @@ async def sign_up(message: types.Message, state: FSMContext):
     await Menu.choose_doctor.set()
 
 
-# TODO
-async def show_note(message: types.Message):
-    await Menu.show_appointment.set()
-    await message.answer('')
+async def show_appointment(message: types.Message):
+    if database.check_client_note(message.from_user.id) == False:
+        await message.answer('Вы не записывались в клинику')
+        await start_menu(message)
+        return
+    await message.answer(database.show_client_note(message.from_user.id))
+    await start_menu(message)
 
 
 # ==========================ЗАПИСЬ В ТАБЛИЦУ ЗАПИСЕЙ====================================================
-
 @dp.message_handler(state=Menu.choose_doctor)
 async def switch_doctor(message: types.Message, state: FSMContext):
     if message.text == 'Я знаю врача':
-        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        keyboard.add('Выбрать врача')
-        await message.answer('.', reply_markup=keyboard)
         await Appointment.know_doctor.set()
+        await choose_doctor(message)
     elif message.text == 'Я не знаю врача':
-        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        keyboard.add('Выбрать время')
-        await message.answer('.', reply_markup=keyboard)
         await Appointment.dont_know_doctor.set()
+        await print(1)
 
 
-@dp.message_handler(state=Appointment.know_doctor)
-async def choose_doctor(message: types.Message, state: FSMContext):
+async def choose_doctor(message: types.Message):
     if database.check_client_note(message.from_user.id):
         await message.answer('Вы уже записаны')
-        await cmd_start(message)
+        await start_menu(message)
         return
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = database.show_doctors()
@@ -154,19 +154,64 @@ async def send_appointment(message: types.Message, state: FSMContext):
     await state.update_data(time=message.text)
     database.add_note(await state.get_data())
     await state.reset_data()
+    await Appointment.add_appointment.set()
     await message.answer('Запись добавлена')
-    await cmd_start(message)
+    await input_name(message)
 
 
-# =================================КЛАССЫ ОБЪЕКТОВ=============================================
+# =================================ЗАПИСЬ ДАННЫХ ЮЗЕРОВ=============================================
+async def input_name(message: types.Message):
+    if database.check_client_info(message.from_user.id):
+        await message.answer("Вы уже вводили свои данные")
+        await message.answer(database.show_client_info(message.from_user.id))
+        await start_menu(message)
+        return
+    await message.answer("Введите свое ФИО")
+    await ClientInfo.name.set()
 
-class Client:
-    def __init__(self, client_id, name=None, birthday=None, tel_num=None, other_info=None) -> None:
-        self.client_id = client_id
-        self.name = name
-        self.birthday = birthday
-        self.tel_num = tel_num
-        self.other_info = other_info
+
+@dp.message_handler(state=ClientInfo.name)
+async def input_birthday(message: types.Message, state: FSMContext):
+    if re.match('^[а-яА-Я]+(-[а-яА-Я]+)*$', message.text) is None:
+        await message.answer("Некорректный ввод ФИО\nВведите ФИО повторно")
+        return
+    await message.answer("Введите свой др")
+    await state.update_data(client_id=message.from_user.id)
+    await state.update_data(name=message.text)
+    await ClientInfo.birthday.set()
+
+
+@dp.message_handler(state=ClientInfo.birthday)
+async def input_tel_num(message: types.Message, state: FSMContext):
+    if re.match('^(\d{2}|\d{1}).(\d{2}|\d{1}).(\d{4})$', message.text) is None:
+        await message.answer("Некорректный ввод даты\nВведите дату повторно\nПример: дд.мм.гггг")
+        return
+    await message.answer("Введите свой телефон")
+
+    await state.update_data(birthday=message.text)
+    await ClientInfo.tel_num.set()
+
+
+@dp.message_handler(state=ClientInfo.tel_num)
+async def input_other_info(message: types.Message, state: FSMContext):
+    if re.match('^(\+7|7|8){1}\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$', message.text) is None:
+        await message.answer("Некорректный ввод номера\nВведите номер телефона повторно")
+        return
+    await message.answer("Введите доп. инфо")
+
+    await state.update_data(tel_num=message.text)
+    await ClientInfo.other_info.set()
+
+
+@dp.message_handler(state=ClientInfo.other_info)
+async def send_client_info(message: types.Message, state: FSMContext):
+    await state.update_data(other_info=message.text)
+    database.add_client(await state.get_data())
+    await state.reset_data()
+
+    await message.answer('Данные записаны')
+    await state.finish()
+    await start_menu(message)
 
 
 executor.start_polling(dp)
