@@ -5,6 +5,7 @@ FUCKING SLAVES
 STICK UR FINGER IN MY ASS
 '''
 import re
+from typing import Text
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -36,6 +37,7 @@ class Menu(StatesGroup):
     keyboard_menu = State()
     sign_up = State()
     show_appointment = State()
+
     choose_doctor = State()
 
 
@@ -54,6 +56,23 @@ class ClientInfo(StatesGroup):
     tel_num = State()
     other_info = State()
 
+
+# =============================ОБЩАЯ КЛАВИАТУРА=================================================
+def cancel_keyboard():
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    buttons = ['Назад', 'Отмена']
+    keyboard.add(*buttons)
+
+    return keyboard
+
+
+@dp.message_handler(lambda msg: msg.text == 'Отмена', state='*')
+async def cancel(message: types.Message, state: FSMContext):
+    await state.finish()
+    database.del_appointment(message.from_user.id)
+    
+    await Menu.start_menu.set()
+    await start_menu(message)
 
 # =============================МЕНЮ=================================================
 @dp.message_handler(commands='start', state='*')
@@ -87,17 +106,27 @@ async def sign_up(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = ['Я знаю врача', 'Я не знаю врача']
     keyboard.add(*buttons)
+    keyboard.add('Назад', 'Отмена')
 
     await message.answer('Выберите', reply_markup=keyboard)
     await Menu.choose_doctor.set()
 
 
 async def show_appointment(message: types.Message):
-    if database.check_client_note(message.from_user.id) == False:
+    if database.check_client_appointment(message.from_user.id) == False:
         await message.answer('Вы не записывались в клинику')
         await start_menu(message)
         return
-    await message.answer(database.show_client_note(message.from_user.id))
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    buttons = ['Назад', 'Удалить запись']
+    keyboard.add(*buttons)
+
+    await message.answer(database.show_client_appointment(message.from_user.id), reply_markup=keyboard)
+
+@dp.message_handler(state=Menu.show_appointment)
+async def del_appointment(message: types.Message):
+    database.del_appointment(message.from_user.id)
+    await message.answer('Запись успешно удалена')
     await start_menu(message)
 
 
@@ -113,13 +142,14 @@ async def switch_doctor(message: types.Message, state: FSMContext):
 
 
 async def choose_doctor(message: types.Message):
-    if database.check_client_note(message.from_user.id):
+    if database.check_client_appointment(message.from_user.id):
         await message.answer('Вы уже записаны')
         await start_menu(message)
         return
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = database.show_doctors()
     keyboard.add(*buttons)
+    keyboard.add('Назад', 'Отмена')
 
     await message.answer('Выберите вашего врача', reply_markup=keyboard)
     await Appointment.set_doctor.set()
@@ -130,6 +160,7 @@ async def choose_date(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = ['01.10', '02.10', '03.10', '04.10', '05.10', '06.10', '07.10']
     keyboard.add(*buttons)
+    keyboard.add('Назад', 'Отмена')
 
     await state.update_data(client_id=message.from_user.id)
     await state.update_data(doctor=message.text)
@@ -140,9 +171,10 @@ async def choose_date(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=Appointment.set_date)
 async def choose_time(message: types.Message, state: FSMContext):
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     buttons = ['00:00', '01:00', '02:00', '03:00', '04:00']
     keyboard.add(*buttons)
+    keyboard.add('Назад', 'Отмена')
 
     await state.update_data(date=message.text)
     await message.answer('Выберите время', reply_markup=keyboard)
@@ -152,7 +184,7 @@ async def choose_time(message: types.Message, state: FSMContext):
 @dp.message_handler(state=Appointment.set_time)
 async def send_appointment(message: types.Message, state: FSMContext):
     await state.update_data(time=message.text)
-    database.add_note(await state.get_data())
+    database.add_apppointment(await state.get_data())
     await state.reset_data()
     await Appointment.add_appointment.set()
     await message.answer('Запись добавлена')
@@ -166,7 +198,7 @@ async def input_name(message: types.Message):
         await message.answer(database.show_client_info(message.from_user.id))
         await start_menu(message)
         return
-    await message.answer("Введите свое ФИО")
+    await message.answer("Введите свое ФИО", reply_markup=cancel_keyboard())
     await ClientInfo.name.set()
 
 
@@ -175,7 +207,7 @@ async def input_birthday(message: types.Message, state: FSMContext):
     if re.match('^[а-яА-Я]+(-[а-яА-Я]+)*$', message.text) is None:
         await message.answer("Некорректный ввод ФИО\nВведите ФИО повторно")
         return
-    await message.answer("Введите свой др")
+    await message.answer("Введите свой др", reply_markup=cancel_keyboard())
     await state.update_data(client_id=message.from_user.id)
     await state.update_data(name=message.text)
     await ClientInfo.birthday.set()
@@ -186,7 +218,7 @@ async def input_tel_num(message: types.Message, state: FSMContext):
     if re.match('^(\d{2}|\d{1}).(\d{2}|\d{1}).(\d{4})$', message.text) is None:
         await message.answer("Некорректный ввод даты\nВведите дату повторно\nПример: дд.мм.гггг")
         return
-    await message.answer("Введите свой телефон")
+    await message.answer("Введите свой телефон", reply_markup=cancel_keyboard())
 
     await state.update_data(birthday=message.text)
     await ClientInfo.tel_num.set()
@@ -197,7 +229,7 @@ async def input_other_info(message: types.Message, state: FSMContext):
     if re.match('^(\+7|7|8){1}\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$', message.text) is None:
         await message.answer("Некорректный ввод номера\nВведите номер телефона повторно")
         return
-    await message.answer("Введите доп. инфо")
+    await message.answer("Введите доп. инфо", reply_markup=cancel_keyboard())
 
     await state.update_data(tel_num=message.text)
     await ClientInfo.other_info.set()
