@@ -54,7 +54,6 @@ db.connect()
 # db.create_tables([Clients, Doctors, AppointmentsList, Holidays, WeekSchedule])
 
 
-# add client into DB
 def add_client(person) -> None:
     Clients.create(client_id=person["client_id"],
                    name=person["name"],
@@ -90,7 +89,6 @@ def check_client_appointment(id: int) -> bool:
         return False
 
 
-# show client info
 def show_client_info(id: int) -> str:
     client = Clients.get(Clients.client_id == id)
     output = "Подтвердите свои данные:\n"

@@ -1,8 +1,9 @@
 import re
 import database
-from datetime import date
-
 import properties
+from datetime import date
+from enums import Keys
+
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -10,7 +11,6 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.utils import executor
 
-from enums import Keys
 
 # configure and run bot
 property_file = properties.Properties("config.txt")
@@ -18,7 +18,6 @@ bot: Bot = Bot(property_file.get_property("bot_token"))
 storage: MemoryStorage = MemoryStorage()
 dp: Dispatcher = Dispatcher(bot, storage=storage)
 
-curr_year = 2021
 
 class Menu(StatesGroup):
     start_menu = State()
@@ -58,6 +57,7 @@ def cancel_keyboard():
 @dp.message_handler(lambda msg: msg.text == "Отмена", state="*")
 async def cancel(message: types.Message, state: FSMContext):
     await state.finish()
+    # TODO: Убрать удаление записи, оставить только возврат на гл. меню (щас костыль)
     database.del_appointment(message.from_user.id)
     await Menu.start_menu.set()
     await start_menu(message)
@@ -65,7 +65,7 @@ async def cancel(message: types.Message, state: FSMContext):
 
 @dp.message_handler(lambda msg: msg.text == "Назад", state="*")
 async def back(message: types.Message, state: FSMContext):
-    # ПЕРЕДЕЛАТЬ ВОЗВРАТ НА ПРЕДЫДУЩИЙ СТЕЙТ
+    # TODO: Переделать, сделать возврат на пред. стейт
     await Menu.start_menu.set()
     await start_menu(message)
 
@@ -191,6 +191,7 @@ async def request_name(message: types.Message, state: FSMContext):
     await ClientInfo.ValidateName.set()
 
 
+# TODO: Исправить валидацию (не проходит Тест Тест)
 @dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+(-[а-яА-Я]+)*$', message.text) is None,
                     state=ClientInfo.ValidateName)
 async def wrong_name(message: types.Message, state: FSMContext):
