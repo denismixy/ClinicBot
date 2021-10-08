@@ -50,7 +50,6 @@ class WeekSchedule(pw.Model):
 
 db.connect()
 
-
 # db.drop_tables([Clients, Doctors, AppointmentsList, Holidays, WeekSchedule])
 # db.create_tables([Clients, Doctors, AppointmentsList, Holidays, WeekSchedule])
 

@@ -63,6 +63,13 @@ async def cancel(message: types.Message, state: FSMContext):
     await start_menu(message)
 
 
+@dp.message_handler(lambda msg: msg.text == "Назад", state="*")
+async def back(message: types.Message, state: FSMContext):
+    # ПЕРЕДЕЛАТЬ ВОЗВРАТ НА ПРЕДЫДУЩИЙ СТЕЙТ
+    await Menu.start_menu.set()
+    await start_menu(message)
+
+
 @dp.message_handler(commands="start", state="*")
 async def cmd_start(message: types.Message):
     await message.answer("Добро пожаловать в нашу клинику")
@@ -104,7 +111,7 @@ async def show_appointment(message: types.Message):
         await start_menu(message)
         return
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    buttons = [Keys.cancel, "Удалить запись"]
+    buttons = [Keys.back, "Удалить запись"]
     keyboard.add(*buttons)
     await message.answer(database.show_client_appointment(message.from_user.id), reply_markup=keyboard)
 
@@ -169,7 +176,7 @@ async def send_appointment(message: types.Message, state: FSMContext):
     await Appointment.add_appointment.set()
     await message.answer("Запись добавлена")
     await ClientInfo.Name.set()
-    await request_name(message)
+    await request_name(message, state)
 
 # Обработка ФИО
 @dp.message_handler(state=ClientInfo.Name)
@@ -187,7 +194,7 @@ async def request_name(message: types.Message, state: FSMContext):
 @dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+(-[а-яА-Я]+)*$', message.text) is None,
                     state=ClientInfo.ValidateName)
 async def wrong_name(message: types.Message, state: FSMContext):
-    await message.answer("Некорректный ввод ФИО, введите ФИО повторно")
+    await message.answer("Некорректный ввод ФИО")
     await ClientInfo.Name.set()
     await request_name(message, state)
 
@@ -210,8 +217,9 @@ async def request_birthday(message: types.Message, state: FSMContext):
 @dp.message_handler(lambda message: re.match(r'^(\d{2}|\d).(\d{2}|\d).(\d{4})$', message.text) is None,
                     state=ClientInfo.ValidateBirthday)
 async def wrong_format_birthday(message: types.Message, state: FSMContext):
-    await message.answer("Некорректный ввод даты рождения, введите повторно")
+    await message.answer("Некорректный ввод даты рождения")
     await ClientInfo.Birthday.set()
+    await request_birthday(message, state)
 
 
 @dp.message_handler(lambda message: re.match(r'^(\d{2}|\d).(\d{2}|\d).(\d{4})$', message.text) is not None,
@@ -247,8 +255,9 @@ async def request_phone(message: types.Message, state: FSMContext):
                                              message.text) is None,
                     state=ClientInfo.ValidateNumber)
 async def wrong_phone(message: types.Message, state: FSMContext):
-    await message.answer("Некорректный ввод номера телефона, введите повторно")
+    await message.answer("Некорректный ввод номера телефона")
     await ClientInfo.PhoneNumber.set()
+    await request_phone(message, state)
 
 
 @dp.message_handler(lambda message: re.match(r'^(\+7|7|8)\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$',
@@ -276,5 +285,6 @@ async def get_info(message: types.Message, state: FSMContext):
     database.add_client(await state.get_data())
     await state.reset_data()
     await Menu.start_menu.set()
+    await start_menu(message)
 
 executor.start_polling(dp)
