@@ -49,6 +49,8 @@ class WeekSchedule(pw.Model):
 
 
 db.connect()
+
+
 # db.drop_tables([Clients, Doctors, AppointmentsList, Holidays, WeekSchedule])
 # db.create_tables([Clients, Doctors, AppointmentsList, Holidays, WeekSchedule])
 
@@ -62,7 +64,7 @@ def add_client(person) -> None:
                    other_info=person["other_info"])
 
 
-def add_apppointment(note) -> None:
+def add_appointment(note) -> None:
     AppointmentsList.create(client_id=note['client_id'],
                             doctor_id=Doctors.get(Doctors.name == note['doctor']),
                             date_and_time=note['date'] + ' ' + note['time'])
@@ -111,7 +113,7 @@ def show_client_appointment(id: int) -> str:
         output += f"Ваше время: {note.date_and_time}"
         return output
     except Exception:
-        return 'О вас нет никакой информации'
+        return "О вас нет никакой информации"
 
 
 def show_doctors() -> list:
