@@ -1,8 +1,8 @@
 import re
 import database
-import properties
+from datetime import date
 
-from typing import Optional
+import properties
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -19,6 +19,7 @@ storage: MemoryStorage = MemoryStorage()
 dp: Dispatcher = Dispatcher(bot, storage=storage)
 executor.start_polling(dp)
 
+curr_year = 2021
 
 class Menu(StatesGroup):
     start_menu = State()
@@ -208,14 +209,28 @@ async def request_birthday(message: types.Message, state: FSMContext):
 
 @dp.message_handler(lambda message: re.match(r'^(\d{2}|\d).(\d{2}|\d).(\d{4})$', message.text) is None,
                     state=ClientInfo.ValidateBirthday)
-async def wrong_birthday(message: types.Message):
+async def wrong_format_birthday(message: types.Message, state: FSMContext):
     await message.answer("Некорректный ввод даты рождения, введите повторно")
     await ClientInfo.Birthday.set()
 
 
 @dp.message_handler(lambda message: re.match(r'^(\d{2}|\d).(\d{2}|\d).(\d{4})$', message.text) is not None,
                     state=ClientInfo.ValidateBirthday)
-async def correct_birthday(message: types.Message, state: FSMContext):
+async def correct_format_birthday(message: types.Message, state: FSMContext):
+    res = re.match(r'^(\d{2}|\d).(\d{2}|\d).(\d{4})$', message.text)
+    day, month, year = int(res[1]), int(res[2]), int(res[3])
+
+    # Если дата некорректная (30 февраля, 46 марта etc)
+    try:
+        py_date = date(year, month, day)
+        wrong_data = date.today() < py_date
+    except ValueError:
+        wrong_data = True
+
+    if wrong_data:
+        await wrong_format_birthday(message, state)
+        return
+
     await state.update_data(birthday=message.text)
     await ClientInfo.PhoneNumber.set()
     await request_phone(message, state)
@@ -231,7 +246,7 @@ async def request_phone(message: types.Message, state: FSMContext):
 @dp.message_handler(lambda message: re.match(r'^(\+7|7|8)\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$',
                                              message.text) is None,
                     state=ClientInfo.ValidateNumber)
-async def wrong_birthday(message: types.Message):
+async def wrong_phone(message: types.Message, state: FSMContext):
     await message.answer("Некорректный ввод номера телефона, введите повторно")
     await ClientInfo.PhoneNumber.set()
 
@@ -239,7 +254,7 @@ async def wrong_birthday(message: types.Message):
 @dp.message_handler(lambda message: re.match(r'^(\+7|7|8)\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$',
                                              message.text) is not None,
                     state=ClientInfo.ValidateNumber)
-async def correct_birthday(message: types.Message, state: FSMContext):
+async def correct_phone(message: types.Message, state: FSMContext):
     await state.update_data(tel_num=message.text)
     await ClientInfo.OtherInfo.set()
     await request_info(message, state)
@@ -252,21 +267,14 @@ async def request_info(message: types.Message, state: FSMContext):
 
 
 @dp.message_handler(state=ClientInfo.GetInfo)
-async def input_other_info(message: types.Message, state: FSMContext):
+async def get_info(message: types.Message, state: FSMContext):
     await state.update_data(other_info=message.text)
     if message.text != '':
         await message.answer("Дополнительная информация записана.")
     else:
         await message.answer("Информация введена")
-
-
-@dp.message_handler(state=ClientInfo.other_info)
-async def send_client_info(message: types.Message, state: FSMContext):
-    await state.update_data(other_info=message.text)
     database.add_client(await state.get_data())
     await state.reset_data()
-    await message.answer("Данные записаны")
-    await state.finish()
-    await start_menu(message)
+    await Menu.start_menu.set()
 
 
