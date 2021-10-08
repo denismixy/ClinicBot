@@ -251,11 +251,6 @@ async def request_info(message: types.Message, state: FSMContext):
     await ClientInfo.GetInfo.set()
 
 
-@dp.message_handler(state=ClientInfo.OtherInfo)
-async def get_info(message: types.Message, state: FSMContext):
-    await message.answer("Введите доп. информацию", reply_markup=cancel_keyboard())
-    await ClientInfo.GetInfo.set()
-
 @dp.message_handler(state=ClientInfo.GetInfo)
 async def input_other_info(message: types.Message, state: FSMContext):
     await state.update_data(other_info=message.text)
