@@ -12,10 +12,12 @@ from aiogram.utils import executor
 
 from enums import Keys
 
+# configure and run bot
 property_file = properties.Properties("config.txt")
 bot: Bot = Bot(property_file.get_property("bot_token"))
 storage: MemoryStorage = MemoryStorage()
 dp: Dispatcher = Dispatcher(bot, storage=storage)
+executor.start_polling(dp)
 
 
 class Menu(StatesGroup):
@@ -36,13 +38,16 @@ class Appointment(StatesGroup):
 
 
 class ClientInfo(StatesGroup):
-    name = State()
-    birthday = State()
-    tel_num = State()
-    other_info = State()
+    Name = State()
+    ValidateName = State()
+    Birthday = State()
+    ValidateBirthday = State()
+    PhoneNumber = State()
+    ValidateNumber = State()
+    OtherInfo = State()
+    GetInfo = State()
 
 
-# =============================ОБЩАЯ КЛАВИАТУРА=================================================
 def cancel_keyboard():
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     buttons = [Keys.back, Keys.cancel]
@@ -57,8 +62,6 @@ async def cancel(message: types.Message, state: FSMContext):
     await Menu.start_menu.set()
     await start_menu(message)
 
-
-# =============================МЕНЮ=================================================
 
 @dp.message_handler(commands="start", state="*")
 async def cmd_start(message: types.Message):
@@ -113,7 +116,6 @@ async def del_appointment(message: types.Message):
     await start_menu(message)
 
 
-# ==========================ЗАПИСЬ В ТАБЛИЦУ ЗАПИСЕЙ====================================================
 @dp.message_handler(state=Menu.choose_doctor)
 async def switch_doctor(message: types.Message, state: FSMContext):
     if message.text == "Я знаю врача":
@@ -166,49 +168,101 @@ async def send_appointment(message: types.Message, state: FSMContext):
     await state.reset_data()
     await Appointment.add_appointment.set()
     await message.answer("Запись добавлена")
-    await input_name(message)
+    await ClientInfo.Name.set()
+    await request_name(message)
 
-
-# =================================ЗАПИСЬ ДАННЫХ ЮЗЕРОВ=============================================
-async def input_name(message: types.Message):
+# Обработка ФИО
+@dp.message_handler(state=ClientInfo.Name)
+async def request_name(message: types.Message):
     if database.check_client_info(message.from_user.id):
         await message.answer("Вы уже вводили свои данные")
         await message.answer(database.show_client_info(message.from_user.id))
         await start_menu(message)
+        # TODO: Проверить, хочет ли клиент изменить / посмотреть данные
         return
     await message.answer("Введите свое ФИО", reply_markup=cancel_keyboard())
-    await ClientInfo.name.set()
+    await ClientInfo.ValidateName.set()
 
 
-@dp.message_handler(state=ClientInfo.name)
-async def input_birthday(message: types.Message, state: FSMContext):
-    if re.match(r'^[а-яА-Я]+(-[а-яА-Я]+)*$', message.text) is None:
-        await message.answer("Некорректный ввод ФИО\nВведите ФИО повторно")
-        return
-    await message.answer("Введите свой др", reply_markup=cancel_keyboard())
-    await state.update_data(client_id=message.from_user.id)
-    await state.update_data(name=message.text)
-    await ClientInfo.birthday.set()
+@dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+(-[а-яА-Я]+)*$', message.text) is None,
+                    state=ClientInfo.ValidateName)
+async def wrong_name(message: types.Message, state: FSMContext):
+    await message.answer("Некорректный ввод ФИО, введите ФИО повторно")
+    await ClientInfo.Name.set()
 
 
-@dp.message_handler(state=ClientInfo.birthday)
-async def input_tel_num(message: types.Message, state: FSMContext):
-    if re.match(r'^(\d{2}|\d).(\d{2}|\d).(\d{4})$', message.text) is None:
-        await message.answer("Некорректный ввод даты\nВведите дату повторно\nПример: дд.мм.гггг")
-        return
-    await message.answer("Введите свой телефон", reply_markup=cancel_keyboard())
+@dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+(-[а-яА-Я]+)*$', message.text) is not None,
+                    state=ClientInfo.ValidateName)
+async def correct_name(message: types.Message, state: FSMContext):
+    await state.update_data(client_id=message.from_user.id, name=message.text)
+    await ClientInfo.Birthday.set()
+    await request_birthday(message, state)
+
+
+# Обработка даты рождения
+@dp.message_handler(state=ClientInfo.Birthday)
+async def request_birthday(message: types.Message, state: FSMContext):
+    await message.answer("Введите дату своего рождения (дд.мм.гггг)", reply_markup=cancel_keyboard())
+    await ClientInfo.ValidateBirthday.set()
+
+
+@dp.message_handler(lambda message: re.match(r'^(\d{2}|\d).(\d{2}|\d).(\d{4})$', message.text) is None,
+                    state=ClientInfo.ValidateBirthday)
+async def wrong_birthday(message: types.Message):
+    await message.answer("Некорректный ввод даты рождения, введите повторно")
+    await ClientInfo.Birthday.set()
+
+
+@dp.message_handler(lambda message: re.match(r'^(\d{2}|\d).(\d{2}|\d).(\d{4})$', message.text) is not None,
+                    state=ClientInfo.ValidateBirthday)
+async def correct_birthday(message: types.Message, state: FSMContext):
     await state.update_data(birthday=message.text)
-    await ClientInfo.tel_num.set()
+    await ClientInfo.PhoneNumber.set()
+    await request_phone(message, state)
 
 
-@dp.message_handler(state=ClientInfo.tel_num)
-async def input_other_info(message: types.Message, state: FSMContext):
-    if re.match(r'^(\+7|7|8)\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$', message.text) is None:
-        await message.answer("Некорректный ввод номера\nВведите номер телефона повторно")
-        return
-    await message.answer("Введите доп. инфо", reply_markup=cancel_keyboard())
+# Обработка телефонного номера
+@dp.message_handler(state=ClientInfo.PhoneNumber)
+async def request_phone(message: types.Message, state: FSMContext):
+    await message.answer("Введите номер телефона", reply_markup=cancel_keyboard())
+    await ClientInfo.ValidateNumber.set()
+
+
+@dp.message_handler(lambda message: re.match(r'^(\+7|7|8)\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$',
+                                             message.text) is None,
+                    state=ClientInfo.ValidateNumber)
+async def wrong_birthday(message: types.Message):
+    await message.answer("Некорректный ввод номера телефона, введите повторно")
+    await ClientInfo.PhoneNumber.set()
+
+
+@dp.message_handler(lambda message: re.match(r'^(\+7|7|8)\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$',
+                                             message.text) is not None,
+                    state=ClientInfo.ValidateNumber)
+async def correct_birthday(message: types.Message, state: FSMContext):
     await state.update_data(tel_num=message.text)
-    await ClientInfo.other_info.set()
+    await ClientInfo.OtherInfo.set()
+    await request_info(message, state)
+
+
+@dp.message_handler(state=ClientInfo.OtherInfo)
+async def request_info(message: types.Message, state: FSMContext):
+    await message.answer("Введите доп. информацию", reply_markup=cancel_keyboard())
+    await ClientInfo.GetInfo.set()
+
+
+@dp.message_handler(state=ClientInfo.OtherInfo)
+async def get_info(message: types.Message, state: FSMContext):
+    await message.answer("Введите доп. информацию", reply_markup=cancel_keyboard())
+    await ClientInfo.GetInfo.set()
+
+@dp.message_handler(state=ClientInfo.GetInfo)
+async def input_other_info(message: types.Message, state: FSMContext):
+    await state.update_data(other_info=message.text)
+    if message.text != '':
+        await message.answer("Дополнительная информация записана.")
+    else:
+        await message.answer("Информация введена")
 
 
 @dp.message_handler(state=ClientInfo.other_info)
@@ -220,4 +274,4 @@ async def send_client_info(message: types.Message, state: FSMContext):
     await state.finish()
     await start_menu(message)
 
-executor.start_polling(dp)
+
