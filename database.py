@@ -96,7 +96,7 @@ def show_client_info(id: int) -> str:
     client = Clients.get(Clients.client_id == id)
     output = "Подтвердите свои данные:\n"
     output += f"Ваше имя: {client.name}\n"
-    output += f"Ваше д\р: {client.birthday}\n"
+    output += f"Ваша дата рождения: {client.birthday}\n"
     output += f"Ваш телефон: {client.tel_num}\n"
     output += f"Доп. инфо: {client.other_info}"
     return output
