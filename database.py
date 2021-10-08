@@ -1,7 +1,7 @@
 import logging
 import peewee as pw
 
-db = pw.SqliteDatabase('clinic.db')
+db = pw.SqliteDatabase("clinic.db")
 
 
 class Clients(pw.Model):
@@ -65,9 +65,9 @@ def add_client(person) -> None:
 
 
 def add_appointment(note) -> None:
-    AppointmentsList.create(client_id=note['client_id'],
-                            doctor_id=Doctors.get(Doctors.name == note['doctor']),
-                            date_and_time=note['date'] + ' ' + note['time'])
+    AppointmentsList.create(client_id=note["client_id"],
+                            doctor_id=Doctors.get(Doctors.name == note["doctor"]),
+                            date_and_time=note["date"] + " " + note["time"])
 
 
 def del_appointment(client_id) -> None:

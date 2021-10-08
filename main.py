@@ -19,12 +19,12 @@ KEY_CANCEL = "Отмена"
 storage = None
 bot = None
 dp = None
-property_file = properties.Properties('config.txt')
+property_file = properties.Properties("config.txt")
 
 
 def init_bot():
     global bot, dp, storage
-    bot = Bot(property_file.get_property('bot_token'))
+    bot = Bot(property_file.get_property("bot_token"))
     storage = MemoryStorage()
     dp = Dispatcher(bot, storage=storage)
 
@@ -66,7 +66,7 @@ def cancel_keyboard():
     return keyboard
 
 
-@dp.message_handler(lambda msg: msg.text == 'Отмена', state='*')
+@dp.message_handler(lambda msg: msg.text == "Отмена", state="*")
 async def cancel(message: types.Message, state: FSMContext):
     await state.finish()
     database.del_appointment(message.from_user.id)
@@ -76,7 +76,7 @@ async def cancel(message: types.Message, state: FSMContext):
 
 # =============================МЕНЮ=================================================
 
-@dp.message_handler(commands='start', state='*')
+@dp.message_handler(commands="start", state="*")
 async def cmd_start(message: types.Message):
     await message.answer("Добро пожаловать в нашу клинику")
     await Menu.start_menu.set()
@@ -86,7 +86,7 @@ async def cmd_start(message: types.Message):
 @dp.message_handler(state=Menu.start_menu)
 async def start_menu(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons = ['Хочу записаться', 'Посмотреть запись']
+    buttons = ["Хочу записаться", "Посмотреть запись"]
     keyboard.add(*buttons)
     await Menu.keyboard_menu.set()
     await message.answer("Выберите действие", reply_markup=keyboard)
@@ -94,30 +94,30 @@ async def start_menu(message: types.Message):
 
 @dp.message_handler(state=Menu.keyboard_menu)
 async def keyboard_menu(message: types.Message, state: FSMContext):
-    if message.text == 'Хочу записаться':
+    if message.text == "Хочу записаться":
         await Menu.sign_up.set()
         await sign_up(message)
-    elif message.text == 'Посмотреть запись':
+    elif message.text == "Посмотреть запись":
         await Menu.show_appointment.set()
         await show_appointment(message)
 
 
 async def sign_up(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons = ['Я знаю врача', 'Я не знаю врача']
+    buttons = ["Я знаю врача", "Я не знаю врача"]
     keyboard.add(*buttons)
     keyboard.add(KEY_CANCEL, KEY_BACK)
-    await message.answer('Выберите', reply_markup=keyboard)
+    await message.answer("Выберите", reply_markup=keyboard)
     await Menu.choose_doctor.set()
 
 
 async def show_appointment(message: types.Message):
     if not database.check_client_appointment(message.from_user.id):
-        await message.answer('Вы не записывались в клинику')
+        await message.answer("Вы не записывались в клинику")
         await start_menu(message)
         return
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    buttons = [KEY_CANCEL, 'Удалить запись']
+    buttons = [KEY_CANCEL, "Удалить запись"]
     keyboard.add(*buttons)
     await message.answer(database.show_client_appointment(message.from_user.id), reply_markup=keyboard)
 
@@ -125,53 +125,53 @@ async def show_appointment(message: types.Message):
 @dp.message_handler(state=Menu.show_appointment)
 async def del_appointment(message: types.Message):
     database.del_appointment(message.from_user.id)
-    await message.answer('Запись успешно удалена')
+    await message.answer("Запись успешно удалена")
     await start_menu(message)
 
 
 # ==========================ЗАПИСЬ В ТАБЛИЦУ ЗАПИСЕЙ====================================================
 @dp.message_handler(state=Menu.choose_doctor)
 async def switch_doctor(message: types.Message, state: FSMContext):
-    if message.text == 'Я знаю врача':
+    if message.text == "Я знаю врача":
         await Appointment.know_doctor.set()
         await choose_doctor(message)
-    elif message.text == 'Я не знаю врача':
+    elif message.text == "Я не знаю врача":
         await Appointment.dont_know_doctor.set()
 
 
 async def choose_doctor(message: types.Message):
     if database.check_client_appointment(message.from_user.id):
-        await message.answer('Вы уже записаны')
+        await message.answer("Вы уже записаны")
         await start_menu(message)
         return
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = database.show_doctors()
     keyboard.add(*buttons)
     keyboard.add(KEY_CANCEL, KEY_BACK)
-    await message.answer('Выберите вашего врача', reply_markup=keyboard)
+    await message.answer("Выберите вашего врача", reply_markup=keyboard)
     await Appointment.set_doctor.set()
 
 
 @dp.message_handler(state=Appointment.set_doctor)
 async def choose_date(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons = ['01.10', '02.10', '03.10', '04.10', '05.10', '06.10', '07.10']
+    buttons = ["01.10", "02.10", "03.10", "04.10", "05.10", "06.10", "07.10"]
     keyboard.add(*buttons)
     keyboard.add(KEY_CANCEL, KEY_BACK)
     await state.update_data(client_id=message.from_user.id)
     await state.update_data(doctor=message.text)
-    await message.answer('Выберите дату', reply_markup=keyboard)
+    await message.answer("Выберите дату", reply_markup=keyboard)
     await Appointment.set_date.set()
 
 
 @dp.message_handler(state=Appointment.set_date)
 async def choose_time(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    buttons = ['00:00', '01:00', '02:00', '03:00', '04:00']
+    buttons = ["00:00", "01:00", "02:00", "03:00", "04:00"]
     keyboard.add(*buttons)
     keyboard.add(KEY_CANCEL, KEY_BACK)
     await state.update_data(date=message.text)
-    await message.answer('Выберите время', reply_markup=keyboard)
+    await message.answer("Выберите время", reply_markup=keyboard)
     await Appointment.set_time.set()
 
 
@@ -181,7 +181,7 @@ async def send_appointment(message: types.Message, state: FSMContext):
     database.add_appointment(await state.get_data())
     await state.reset_data()
     await Appointment.add_appointment.set()
-    await message.answer('Запись добавлена')
+    await message.answer("Запись добавлена")
     await input_name(message)
 
 
@@ -232,7 +232,7 @@ async def send_client_info(message: types.Message, state: FSMContext):
     await state.update_data(other_info=message.text)
     database.add_client(await state.get_data())
     await state.reset_data()
-    await message.answer('Данные записаны')
+    await message.answer("Данные записаны")
     await state.finish()
     await start_menu(message)
 
