@@ -173,7 +173,7 @@ async def send_appointment(message: types.Message, state: FSMContext):
 
 # Обработка ФИО
 @dp.message_handler(state=ClientInfo.Name)
-async def request_name(message: types.Message):
+async def request_name(message: types.Message, state: FSMContext):
     if database.check_client_info(message.from_user.id):
         await message.answer("Вы уже вводили свои данные")
         await message.answer(database.show_client_info(message.from_user.id))
@@ -189,6 +189,7 @@ async def request_name(message: types.Message):
 async def wrong_name(message: types.Message, state: FSMContext):
     await message.answer("Некорректный ввод ФИО, введите ФИО повторно")
     await ClientInfo.Name.set()
+    await request_name(message, state)
 
 
 @dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+(-[а-яА-Я]+)*$', message.text) is not None,
