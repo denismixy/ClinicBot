@@ -1,44 +1,28 @@
-"""
-Copyright "PARTY ON BAAAAAD"
-Donate please, NOT LESS 300$
-FUCKING SLAVES
-STICK UR FINGER IN MY ASS
-"""
-
 import re
 import database
 import properties
+
+from typing import Optional
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.utils import executor
 
-KEY_BACK = "Назад"
-KEY_CANCEL = "Отмена"
-storage = None
-bot = None
-dp = None
+from enums import Keys
+
 property_file = properties.Properties("config.txt")
+bot: Bot = Bot(property_file.get_property("bot_token"))
+storage: MemoryStorage = MemoryStorage()
+dp: Dispatcher = Dispatcher(bot, storage=storage)
 
 
-def init_bot():
-    global bot, dp, storage
-    bot = Bot(property_file.get_property("bot_token"))
-    storage = MemoryStorage()
-    dp = Dispatcher(bot, storage=storage)
-
-
-init_bot()
-
-
-# =============================КЛАССЫ FSM=================================================
 class Menu(StatesGroup):
     start_menu = State()
     keyboard_menu = State()
     sign_up = State()
     show_appointment = State()
-
     choose_doctor = State()
 
 
@@ -61,7 +45,7 @@ class ClientInfo(StatesGroup):
 # =============================ОБЩАЯ КЛАВИАТУРА=================================================
 def cancel_keyboard():
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    buttons = [KEY_BACK, KEY_CANCEL]
+    buttons = [Keys.back, Keys.cancel]
     keyboard.add(*buttons)
     return keyboard
 
@@ -106,7 +90,7 @@ async def sign_up(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = ["Я знаю врача", "Я не знаю врача"]
     keyboard.add(*buttons)
-    keyboard.add(KEY_CANCEL, KEY_BACK)
+    keyboard.add(Keys.cancel, Keys.back)
     await message.answer("Выберите", reply_markup=keyboard)
     await Menu.choose_doctor.set()
 
@@ -117,7 +101,7 @@ async def show_appointment(message: types.Message):
         await start_menu(message)
         return
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    buttons = [KEY_CANCEL, "Удалить запись"]
+    buttons = [Keys.cancel, "Удалить запись"]
     keyboard.add(*buttons)
     await message.answer(database.show_client_appointment(message.from_user.id), reply_markup=keyboard)
 
@@ -147,7 +131,7 @@ async def choose_doctor(message: types.Message):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = database.show_doctors()
     keyboard.add(*buttons)
-    keyboard.add(KEY_CANCEL, KEY_BACK)
+    keyboard.add(Keys.cancel, Keys.back)
     await message.answer("Выберите вашего врача", reply_markup=keyboard)
     await Appointment.set_doctor.set()
 
@@ -157,7 +141,7 @@ async def choose_date(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = ["01.10", "02.10", "03.10", "04.10", "05.10", "06.10", "07.10"]
     keyboard.add(*buttons)
-    keyboard.add(KEY_CANCEL, KEY_BACK)
+    keyboard.add(Keys.cancel, Keys.back)
     await state.update_data(client_id=message.from_user.id)
     await state.update_data(doctor=message.text)
     await message.answer("Выберите дату", reply_markup=keyboard)
@@ -169,7 +153,7 @@ async def choose_time(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     buttons = ["00:00", "01:00", "02:00", "03:00", "04:00"]
     keyboard.add(*buttons)
-    keyboard.add(KEY_CANCEL, KEY_BACK)
+    keyboard.add(Keys.cancel, Keys.back)
     await state.update_data(date=message.text)
     await message.answer("Выберите время", reply_markup=keyboard)
     await Appointment.set_time.set()
