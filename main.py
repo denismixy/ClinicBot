@@ -17,7 +17,6 @@ property_file = properties.Properties("config.txt")
 bot: Bot = Bot(property_file.get_property("bot_token"))
 storage: MemoryStorage = MemoryStorage()
 dp: Dispatcher = Dispatcher(bot, storage=storage)
-executor.start_polling(dp)
 
 curr_year = 2021
 
@@ -277,4 +276,4 @@ async def get_info(message: types.Message, state: FSMContext):
     await state.reset_data()
     await Menu.start_menu.set()
 
-
+executor.start_polling(dp)
