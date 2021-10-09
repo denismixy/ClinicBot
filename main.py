@@ -1,8 +1,9 @@
 import re
 import database
-from datetime import date
-
 import properties
+from datetime import date
+from enums import Keys
+
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -10,7 +11,6 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.utils import executor
 
-from enums import Keys
 
 # configure and run bot
 property_file = properties.Properties("config.txt")
@@ -18,7 +18,6 @@ bot: Bot = Bot(property_file.get_property("bot_token"))
 storage: MemoryStorage = MemoryStorage()
 dp: Dispatcher = Dispatcher(bot, storage=storage)
 
-curr_year = 2021
 
 class Menu(StatesGroup):
     start_menu = State()
@@ -38,6 +37,9 @@ class Appointment(StatesGroup):
 
 
 class ClientInfo(StatesGroup):
+    ShowInfo = State()
+    AcceptInfo = State()
+    ChangeInfo = State()
     Name = State()
     ValidateName = State()
     Birthday = State()
@@ -58,7 +60,15 @@ def cancel_keyboard():
 @dp.message_handler(lambda msg: msg.text == "Отмена", state="*")
 async def cancel(message: types.Message, state: FSMContext):
     await state.finish()
+    # TODO: Убрать удаление записи, оставить только возврат на гл. меню (щас костыль)
     database.del_appointment(message.from_user.id)
+    await Menu.start_menu.set()
+    await start_menu(message)
+
+
+@dp.message_handler(lambda msg: msg.text == "Назад", state="*")
+async def back(message: types.Message, state: FSMContext):
+    # TODO: Переделать, сделать возврат на пред. стейт
     await Menu.start_menu.set()
     await start_menu(message)
 
@@ -90,6 +100,10 @@ async def keyboard_menu(message: types.Message, state: FSMContext):
 
 
 async def sign_up(message: types.Message):
+    if database.check_client_appointment(message.from_user.id):
+        await message.answer("Вы уже записаны")
+        await start_menu(message)
+        return
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = ["Я знаю врача", "Я не знаю врача"]
     keyboard.add(*buttons)
@@ -104,7 +118,7 @@ async def show_appointment(message: types.Message):
         await start_menu(message)
         return
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    buttons = [Keys.cancel, "Удалить запись"]
+    buttons = [Keys.back, "Удалить запись"]
     keyboard.add(*buttons)
     await message.answer(database.show_client_appointment(message.from_user.id), reply_markup=keyboard)
 
@@ -126,10 +140,6 @@ async def switch_doctor(message: types.Message, state: FSMContext):
 
 
 async def choose_doctor(message: types.Message):
-    if database.check_client_appointment(message.from_user.id):
-        await message.answer("Вы уже записаны")
-        await start_menu(message)
-        return
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     buttons = database.show_doctors()
     keyboard.add(*buttons)
@@ -168,26 +178,64 @@ async def send_appointment(message: types.Message, state: FSMContext):
     await state.reset_data()
     await Appointment.add_appointment.set()
     await message.answer("Запись добавлена")
+    await ClientInfo.ShowInfo.set()
+    await show_client_info(message, state)
+
+
+@dp.message_handler(state=ClientInfo.ShowInfo)
+async def show_client_info(message: types.Message, state: FSMContext):
+    if database.check_client_info(message.from_user.id):
+        show_info_keyboard = types.InlineKeyboardMarkup()
+        buttons = [
+            types.InlineKeyboardButton(text = "Изменить", callback_data="change_info"),
+            types.InlineKeyboardButton(text = "Принять", callback_data="accept_info")
+        ]
+        show_info_keyboard.add(*buttons)
+        await message.answer("Вы уже вводили свои данные\nПроверьте их правильность")
+        await message.answer(database.show_client_info(message.from_user.id), reply_markup=show_info_keyboard)
+    else:
+        ClientInfo.Name.set()
+        request_name(message, state)
+
+
+@dp.callback_query_handler(lambda call: True, state=ClientInfo.ShowInfo)
+async def switch_callback_client_info(call: types.CallbackQuery, state: FSMContext):
+    if call.data == "accept_info":
+        await ClientInfo.AcceptInfo.set()
+        await accept_client_info(call, state)
+    elif call.data == "change_info":
+        await ClientInfo.ChangeInfo.set()
+        await change_client_info(call, state)
+
+
+async def accept_client_info(call: types.CallbackQuery, state: FSMContext):
+    await call.message.answer("Запись в клинику прошла успешно\nВсего доброго!")
+    await call.answer()
+    await Menu.start_menu.set()
+    await start_menu(call.message)
+
+
+#TODO: Сделать выбор для изменения конкретного поля Клиента
+async def change_client_info(call: types.CallbackQuery, state: FSMContext):
+    database.del_client(call.from_user.id)
+    await call.message.answer("Ваша учетная запись удалена\nВведите данные повторно")
+    await call.answer()
     await ClientInfo.Name.set()
-    await request_name(message)
+    await request_name(call.message, state)
+
 
 # Обработка ФИО
 @dp.message_handler(state=ClientInfo.Name)
 async def request_name(message: types.Message, state: FSMContext):
-    if database.check_client_info(message.from_user.id):
-        await message.answer("Вы уже вводили свои данные")
-        await message.answer(database.show_client_info(message.from_user.id))
-        await start_menu(message)
-        # TODO: Проверить, хочет ли клиент изменить / посмотреть данные
-        return
     await message.answer("Введите свое ФИО", reply_markup=cancel_keyboard())
     await ClientInfo.ValidateName.set()
 
 
+# TODO: Исправить валидацию (не проходит Тест Тест)
 @dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+(-[а-яА-Я]+)*$', message.text) is None,
                     state=ClientInfo.ValidateName)
 async def wrong_name(message: types.Message, state: FSMContext):
-    await message.answer("Некорректный ввод ФИО, введите ФИО повторно")
+    await message.answer("Некорректный ввод ФИО")
     await ClientInfo.Name.set()
     await request_name(message, state)
 
@@ -210,8 +258,9 @@ async def request_birthday(message: types.Message, state: FSMContext):
 @dp.message_handler(lambda message: re.match(r'^(\d{2}|\d).(\d{2}|\d).(\d{4})$', message.text) is None,
                     state=ClientInfo.ValidateBirthday)
 async def wrong_format_birthday(message: types.Message, state: FSMContext):
-    await message.answer("Некорректный ввод даты рождения, введите повторно")
+    await message.answer("Некорректный ввод даты рождения")
     await ClientInfo.Birthday.set()
+    await request_birthday(message, state)
 
 
 @dp.message_handler(lambda message: re.match(r'^(\d{2}|\d).(\d{2}|\d).(\d{4})$', message.text) is not None,
@@ -247,8 +296,9 @@ async def request_phone(message: types.Message, state: FSMContext):
                                              message.text) is None,
                     state=ClientInfo.ValidateNumber)
 async def wrong_phone(message: types.Message, state: FSMContext):
-    await message.answer("Некорректный ввод номера телефона, введите повторно")
+    await message.answer("Некорректный ввод номера телефона")
     await ClientInfo.PhoneNumber.set()
+    await request_phone(message, state)
 
 
 @dp.message_handler(lambda message: re.match(r'^(\+7|7|8)\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$',
@@ -269,12 +319,10 @@ async def request_info(message: types.Message, state: FSMContext):
 @dp.message_handler(state=ClientInfo.GetInfo)
 async def get_info(message: types.Message, state: FSMContext):
     await state.update_data(other_info=message.text)
-    if message.text != '':
-        await message.answer("Дополнительная информация записана.")
-    else:
-        await message.answer("Информация введена")
+    await message.answer("Запись в клинику прошла успешно\nВсего доброго!")
     database.add_client(await state.get_data())
     await state.reset_data()
     await Menu.start_menu.set()
+    await start_menu(message)
 
 executor.start_polling(dp)
