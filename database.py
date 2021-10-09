@@ -64,6 +64,15 @@ def add_client(person) -> None:
                    other_info=person["other_info"])
 
 
+def del_client(person_id) -> None:
+    Clients.delete_by_id(person_id)
+
+
+#TODO: сделать изменение значения в поле клиента
+def update_client(person_id, field, value) -> None:
+    Clients.update(field = value).where(Clients.client_id == person_id)
+
+
 def add_appointment(note) -> None:
     AppointmentsList.create(client_id=note["client_id"],
                             doctor_id=Doctors.get(Doctors.name == note["doctor"]),
@@ -71,8 +80,11 @@ def add_appointment(note) -> None:
 
 
 def del_appointment(client_id) -> None:
-    note_id = AppointmentsList.get(AppointmentsList.client_id == client_id)
-    AppointmentsList.delete_by_id(note_id.id)
+    try:
+        note_id = AppointmentsList.get(AppointmentsList.client_id == client_id)
+        AppointmentsList.delete_by_id(note_id.id)
+    except Exception:
+        return
 
 
 def check_client_info(id: int) -> bool:
