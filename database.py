@@ -106,7 +106,7 @@ def check_client_appointment(id: int) -> bool:
 # show client info
 def show_client_info(id: int) -> str:
     client = Clients.get(Clients.client_id == id)
-    output = "Подтвердите свои данные:\n"
+    output = ""
     output += f"Ваше имя: {client.name}\n"
     output += f"Ваша дата рождения: {client.birthday}\n"
     output += f"Ваш телефон: {client.tel_num}\n"
