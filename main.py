@@ -292,7 +292,7 @@ async def request_name(message: types.Message, state: FSMContext):
 
 
 # TODO: Исправить валидацию (не проходит Тест Тест)
-@dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+(-[а-яА-Я]+)*$', message.text) is None,
+@dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+((\s|-)?[а-яА-Я]+)*$', message.text) is None,
                     state=ClientInfo.ValidateName)
 async def wrong_name(message: types.Message, state: FSMContext):
     await message.answer("Некорректный ввод ФИО")
@@ -300,7 +300,7 @@ async def wrong_name(message: types.Message, state: FSMContext):
     await request_name(message, state)
 
 
-@dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+(-[а-яА-Я]+)*$', message.text) is not None,
+@dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+((\s|-)?[а-яА-Я]+)*$', message.text) is not None,
                     state=ClientInfo.ValidateName)
 async def correct_name(message: types.Message, state: FSMContext):
     await state.update_data(client_id=message.from_user.id, name=message.text)
