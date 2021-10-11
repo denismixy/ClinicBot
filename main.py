@@ -15,7 +15,7 @@ from aiogram.utils import executor
 
 
 # configure and run bot
-property_file = properties.Properties("config.txt")
+property_file = properties.Properties("config.json")
 bot: Bot = Bot(property_file.get_property("bot_token"))
 storage: MemoryStorage = MemoryStorage()
 dp: Dispatcher = Dispatcher(bot, storage=storage)
@@ -354,8 +354,20 @@ async def correct_name(message: types.Message, state: FSMContext):
 # Обработка даты рождения
 @dp.message_handler(state=ClientInfo.Birthday)
 async def request_birthday(message: types.Message, state: FSMContext):
-    await message.answer("Введите дату своего рождения (дд.мм.гггг)", reply_markup=cancel_keyboard())
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    buttons = [
+        types.InlineKeyboardButton(text="Назад", callback_data="10")
+    ]
+    keyboard.add(*buttons)
+    await message.answer("Введите дату своего рождения (дд.мм.гггг)", reply_markup=keyboard)
     await ClientInfo.ValidateBirthday.set()
+
+
+@dp.callback_query_handler(lambda call: True, state=ClientInfo.ValidateBirthday)
+async def callback_request_birthday(call: types.CallbackQuery, state: FSMContext):
+    await ClientInfo.Name.set()
+    await call.message.delete()
+    await request_name(call.message, state)
 
 
 @dp.message_handler(lambda message: re.match(r'^(\d{2}|\d).(\d{2}|\d).(\d{4})$', message.text) is None,
