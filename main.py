@@ -71,8 +71,17 @@ async def cancel(message: types.Message, state: FSMContext):
 @dp.message_handler(lambda msg: msg.text == "Назад", state="*")
 async def back(message: types.Message, state: FSMContext):
     # TODO: Переделать, сделать возврат на пред. стейт
-    await Menu.start_menu.set()
-    await start_menu(message, state)
+    dictionary = await state.get_data()
+    list_state = dictionary["list_state"]
+    await state.set_state(list_state.pop())
+    await state.update_data(list_state = list_state)
+
+
+async def update_state_list(state: FSMContext):
+    dictionary = await state.get_data()
+    list_state: list = dictionary["list_state"]
+    list_state.append(await state.get_state())
+    await state.update_data(list_state=list_state)
 
 
 @dp.message_handler(commands="start", state="*")
@@ -86,7 +95,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
 async def start_menu(message: types.Message, state: FSMContext):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     buttons = [
-        types.KeyboardButton("Хочу записаться"),
+        types.KeyboardButton("Хочу записаться", ),
         types.KeyboardButton("Посмотреть запись")
         ]
     keyboard.add(*buttons)
@@ -96,6 +105,9 @@ async def start_menu(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=Menu.keyboard_menu)
 async def callback_start_menu(message: types.Message, state: FSMContext):
+    await state.update_data(list_state=[])
+    await update_state_list(state)
+    print(await state.get_data("list_state"))
     if message.text == "Хочу записаться":
         await Menu.sign_up.set()
         await sign_up(message, state)
@@ -114,7 +126,7 @@ async def show_appointment(message: types.Message, state: FSMContext):
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     buttons = [
         types.InlineKeyboardButton(text="Удалить запись", callback_data="delete_appointment"),
-        types.InlineKeyboardButton(text="Назад", callback_data="back")
+        types.InlineKeyboardButton(text=Keys.back, callback_data="back")
         ]
     keyboard.add(*buttons)
     await message.answer(database.show_client_appointment(message.from_user.id), reply_markup=keyboard)
@@ -122,6 +134,8 @@ async def show_appointment(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(lambda call: True, state=Menu.show_appointment)
 async def callback_show_appointment(call: types.CallbackQuery, state: FSMContext):
+    await update_state_list(state)
+    print(await state.get_data("list_state"))
     await call.message.delete_reply_markup()
     await call.answer()
     if call.data == "delete_appointment":
@@ -150,39 +164,50 @@ async def sign_up(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(lambda call: True, state=Menu.sign_up)
 async def callback_sign_up(call: types.CallbackQuery, state: FSMContext):
+    await update_state_list(state)
+    print(await state.get_data("list_state"))
     if call.data == "know_doctor":
         await Appointment.know_doctor.set()
         await call.message.delete()
         await call.answer()
-        await choose_doctor(call, state)
+        await choose_doctor(call.message, state)
     elif call.data == "dont_know_doctor":
         await Appointment.dont_know_doctor.set()
 
 
 @dp.message_handler(state=Appointment.know_doctor)
-async def choose_doctor(call: types.CallbackQuery, state: FSMContext):
+async def choose_doctor(message: types.Message, state: FSMContext):
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     doctors_list = database.show_doctors()
     buttons = []
     for doctor in doctors_list:
         buttons.append(types.InlineKeyboardButton(text=doctor, callback_data=doctor))
     keyboard.add(*buttons)
-    await call.message.answer("Выберите вашего врача", reply_markup=keyboard)
+    keyboard.add(types.InlineKeyboardButton(text=Keys.back, callback_data="1"))
+    await message.answer("Выберите своего врача", reply_markup=keyboard)
 
 
 @dp.callback_query_handler(lambda call: True, state=Appointment.know_doctor)
 async def callback_choose_doctor(call: types.CallbackQuery, state: FSMContext):
+    if call.data in callback_back_dict:
+        await call.message.delete()
+        await call.answer()
+        await back(call.message, state)
+        await callback_back_dict[call.data](call.message, state)
+        return
+    await update_state_list(state)
+    print(await state.get_data("list_state"))
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваш врач: " + call.data)
     await call.answer()
     await state.update_data(client_id=call.from_user.id)
     await state.update_data(doctor = call.data)
     await Appointment.set_doctor.set()
-    await choose_date(call, state)
+    await choose_date(call.message, state)
 
 
 @dp.message_handler(state=Appointment.set_doctor)
-async def choose_date(call: types.CallbackQuery, state: FSMContext):
+async def choose_date(message: types.Message, state: FSMContext):
     keyboard = types.InlineKeyboardMarkup()
     buttons = [
         types.InlineKeyboardButton(text="01.10", callback_data="01.10"),
@@ -193,21 +218,30 @@ async def choose_date(call: types.CallbackQuery, state: FSMContext):
         types.InlineKeyboardButton(text="06.10", callback_data="06.10")
         ]
     keyboard.add(*buttons)
-    await call.message.answer("Выберите дату", reply_markup=keyboard)
+    keyboard.add(types.InlineKeyboardButton(text=Keys.back, callback_data="2"))
+    await message.answer("Выберите дату", reply_markup=keyboard)
 
 
 @dp.callback_query_handler(lambda call: True, state=Appointment.set_doctor)
 async def callback_choose_date(call: types.CallbackQuery, state: FSMContext):
+    if call.data in callback_back_dict:
+        await call.message.delete()
+        await call.answer()
+        await back(call.message, state)
+        await callback_back_dict[call.data](call.message, state)
+        return
+    await update_state_list(state)
+    print(await state.get_data("list_state"))
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваша дата: " + call.data)
     await call.answer()
     await state.update_data(date = call.data)
     await Appointment.set_date.set()
-    await choose_time(call, state)
+    await choose_time(call.message, state)
 
 
 @dp.message_handler(state=Appointment.set_date)
-async def choose_time(call: types.CallbackQuery, state: FSMContext):
+async def choose_time(message: types.Message, state: FSMContext):
     time_keyboard = types.InlineKeyboardMarkup()
     buttons = [
         types.InlineKeyboardButton(text="00:00", callback_data="00:00"),
@@ -217,11 +251,20 @@ async def choose_time(call: types.CallbackQuery, state: FSMContext):
         types.InlineKeyboardButton(text="04:00", callback_data="04:00"),
     ]
     time_keyboard.add(*buttons)
-    await call.message.answer("Выберите время", reply_markup=time_keyboard)
+    time_keyboard.add(types.InlineKeyboardButton(text=Keys.back, callback_data="3"))
+    await message.answer("Выберите время", reply_markup=time_keyboard)
     
 
 @dp.callback_query_handler(lambda call: True, state=Appointment.set_date)
 async def callback_choose_time(call: types.CallbackQuery, state: FSMContext):
+    if call.data in callback_back_dict:
+        await call.message.delete()
+        await call.answer()
+        await back(call.message, state)
+        await callback_back_dict[call.data](call.message, state)
+        return
+    await update_state_list(state)
+    print(await state.get_data("list_state"))
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваше время: " + call.data)
     await call.answer()
@@ -233,7 +276,6 @@ async def callback_choose_time(call: types.CallbackQuery, state: FSMContext):
 @dp.message_handler(state=Appointment.set_time)
 async def send_appointment(call: types.CallbackQuery, state: FSMContext):
     database.add_appointment(await state.get_data())
-    await state.reset_data()
     await Appointment.add_appointment.set()
     #await message.answer("Запись добавлена")
     await ClientInfo.ShowInfo.set()
@@ -271,6 +313,7 @@ async def switch_callback_client_info(call: types.CallbackQuery, state: FSMConte
 async def accept_client_info(call: types.CallbackQuery, state: FSMContext):
     await call.message.answer("Запись в клинику прошла успешно\nВсего доброго!")
     await call.answer()
+    await state.reset_data()
     await Menu.start_menu.set()
     await start_menu(call.message, state)
 
@@ -384,5 +427,16 @@ async def get_info(message: types.Message, state: FSMContext):
     await state.reset_data()
     await Menu.start_menu.set()
     await start_menu(message, state)
+
+
+callback_back_dict = {
+    "1": sign_up,
+    "2": choose_doctor,
+    "3": choose_date,
+    "4": choose_time,
+    "5": ""
+}
+
+
 
 executor.start_polling(dp)
