@@ -48,6 +48,8 @@ class ClientInfo(StatesGroup):
     PhoneNumber = State()
     ValidateNumber = State()
     OtherInfo = State()
+    SwitchOtherInfo = State()
+    FinallyChecker = State()
     GetInfo = State()
 
 
@@ -60,6 +62,7 @@ def cancel_keyboard():
 
 @dp.message_handler(lambda msg: msg.text == "Отмена", state="*")
 async def cancel(message: types.Message, state: FSMContext):
+    database.check_client_appointment(message.from_user.id)
     await Menu.start_menu.set()
     await start_menu(message, state)
 
@@ -138,7 +141,7 @@ async def show_appointment(message: types.Message, state: FSMContext):
         await Menu.start_menu.set()
         await start_menu(message, state)
         return
-    keyboard = types.ReplyKeyboardMarkup(row_width=1)
+    keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
     buttons = [
         types.KeyboardButton(text="Удалить запись"),
         types.KeyboardButton(text=Keys.back)
@@ -168,7 +171,7 @@ async def sign_up(message: types.Message, state: FSMContext):
         await Menu.start_menu.set()
         await start_menu(message, state)
         return
-    keyboard = types.ReplyKeyboardMarkup(row_width=2)
+    keyboard = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     buttons = [
         types.KeyboardButton(text="Я знаю врача"),
         types.KeyboardButton(text="Я не знаю врача"),
@@ -201,6 +204,7 @@ async def choose_doctor(message: types.Message, state: FSMContext):
     for doctor in doctors_list:
         buttons.append(types.InlineKeyboardButton(text=doctor, callback_data=doctor))
     keyboard.add(*buttons)
+    await message.answer("👨‍⚕👩‍⚕", reply_markup=cancel_keyboard())
     await message.answer("Выберите своего врача", reply_markup=keyboard)
 
 
@@ -231,6 +235,7 @@ async def choose_date(message: types.Message, state: FSMContext):
         types.InlineKeyboardButton(text="06.10", callback_data="06.10")
     ]
     keyboard.add(*buttons)
+    await message.answer("📅", reply_markup=cancel_keyboard())
     await message.answer("Выберите дату", reply_markup=keyboard)
 
 
@@ -259,6 +264,7 @@ async def choose_time(message: types.Message, state: FSMContext):
         types.InlineKeyboardButton(text="04:00", callback_data="04:00"),
     ]
     time_keyboard.add(*buttons)
+    await message.answer("🕒", reply_markup=cancel_keyboard())
     await message.answer("Выберите время", reply_markup=time_keyboard)
 
 
@@ -340,7 +346,6 @@ async def request_name(message: types.Message, state: FSMContext):
     await ClientInfo.ValidateName.set()
 
 
-# TODO: Исправить валидацию (не проходит Тест Тест)
 @dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+((\s|-)?[а-яА-Я]+)*$', message.text) is None,
                     state=ClientInfo.ValidateName)
 async def wrong_name(message: types.Message, state: FSMContext):
@@ -438,16 +443,41 @@ async def request_info(message: types.Message, state: FSMContext):
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     await message.answer("Введите доп. информацию", reply_markup=cancel_keyboard())
-    await ClientInfo.GetInfo.set()
+    await ClientInfo.FinallyChecker.set()
 
 
-# TODO переделать метод
-#  1) не дает отменить последнее действие, не запрашивет подтверждение перед записью
-#  2) наверное стоит вносить изменения в БД здесь
+@dp.message_handler(state=ClientInfo.FinallyChecker)
+async def previously_request_info(message: types.Message, state: FSMContext):
+    name_current_function = inspect.currentframe().f_code.co_name
+    await update_function_list(state, name_current_function)
+    await update_state_list(state)
+    await state.update_data(other_info=message.text)
+    keyboard = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    buttons = [
+        types.KeyboardButton(text="Подтвердить"),
+        types.KeyboardButton(text="Назад"),
+        types.KeyboardButton(text="Отмена")
+    ]
+    keyboard.add(*buttons)
+    dictionary = await state.get_data()
+    await ClientInfo.SwitchOtherInfo.set()
+    await message.answer(f"Ваше ФИО: {dictionary['name']}\n"
+                         f"Ваш день рождения: {dictionary['birthday']}\n"
+                         f"Ваш телефонный номер: {dictionary['tel_num']}\n"
+                         f"Дополнительная информация: {dictionary['other_info']}\n", reply_markup=keyboard)
+
+
+@dp.message_handler(state=ClientInfo.SwitchOtherInfo)
+async def switch_request_info(message: types.Message, state: FSMContext):
+    if message.text == "Подтвердить":
+        await ClientInfo.GetInfo.set()
+        await get_info(message, state)
+
+
 @dp.message_handler(state=ClientInfo.GetInfo)
 async def get_info(message: types.Message, state: FSMContext):
-    await state.update_data(other_info=message.text)
-    await message.answer("Запись в клинику прошла успешно\nВсего доброго!")
+    await message.answer("Запись в клинику прошла успешно\n"
+                         "Всего доброго!")
     database.add_client(await state.get_data())
     await state.reset_data()
     await Menu.start_menu.set()
