@@ -98,15 +98,17 @@ def check_client_info(id: int) -> bool:
 def check_client_appointment(id: int) -> bool:
     try:
         AppointmentsList.get(AppointmentsList.client_id == id)
+        Clients.get(Clients.client_id == id)
         return True
     except Exception:
+        del_appointment(id)
         return False
 
 
 # show client info
 def show_client_info(id: int) -> str:
     client = Clients.get(Clients.client_id == id)
-    output = "Подтвердите свои данные:\n"
+    output = ""
     output += f"Ваше имя: {client.name}\n"
     output += f"Ваша дата рождения: {client.birthday}\n"
     output += f"Ваш телефон: {client.tel_num}\n"
@@ -125,7 +127,7 @@ def show_client_appointment(id: int) -> str:
         output += f"Ваше время: {note.date_and_time}"
         return output
     except Exception:
-        return "О вас нет никакой информации"
+        return ''
 
 
 def show_doctors() -> list:

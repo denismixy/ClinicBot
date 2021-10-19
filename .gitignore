@@ -2,5 +2,5 @@
 __pycache__
 config.py
 *.db
-config.txt
+config.json
 token
