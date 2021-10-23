@@ -125,7 +125,7 @@ async def start_menu(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=Menu.keyboard_menu)
 async def switch_start_menu(message: types.Message, state: FSMContext):
-    print(datetime.datetime.now(), await state.get_data("list_state"))
+    print(message.chat.id, datetime.datetime.now(), await state.get_data("list_state"))
     if message.text == "Хочу записаться":
         await Menu.sign_up.set()
         await sign_up(message, state)
@@ -156,7 +156,7 @@ async def show_appointment(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=Menu.switch_show_appointment)
 async def switch_show_appointment(message: types.Message, state: FSMContext):
-    print(datetime.datetime.now(), await state.get_data("list_state"))
+    print(message.chat.id, datetime.datetime.now(), await state.get_data("list_state"))
     if message.text == "Удалить запись":
         database.del_appointment(message.from_user.id)
         await message.answer("Запись успешно удалена")
@@ -188,7 +188,7 @@ async def sign_up(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=Menu.switch_sign_up)
 async def switch_sign_up(message: types.Message, state: FSMContext):
-    print(datetime.datetime.now(), await state.get_data("list_state"))
+    print(message.chat.id, datetime.datetime.now(), await state.get_data("list_state"))
     if message.text == "Я знаю врача":
         await Appointment.know_doctor.set()
         await choose_doctor(message, state)
@@ -218,7 +218,7 @@ async def dont_know_choose_date(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(lambda call: True, state=Appointment.dont_know_doctor)
 async def dont_know_callback_choose_date(call: types.CallbackQuery, state: FSMContext):
-    print(datetime.datetime.now(), await state.get_data("list_state"))
+    print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваша дата: " + call.data)
     await call.answer()
@@ -247,7 +247,7 @@ async def dont_know_choose_time(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(lambda call: True, state=Appointment.dont_know_date)
 async def dont_know_callback_choose_time(call: types.CallbackQuery, state: FSMContext):
-    print(datetime.datetime.now(), await state.get_data("list_state"))
+    print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваше время: " + call.data)
     await call.answer()
@@ -273,7 +273,7 @@ async def dont_know_choose_doctor(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(lambda call: True, state=Appointment.dont_know_set_time)
 async def dont_know_callback_choose_doctor(call: types.CallbackQuery, state: FSMContext):
-    print(datetime.datetime.now(), await state.get_data("list_state"))
+    print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваш врач: " + call.data)
     await call.answer()
@@ -300,7 +300,7 @@ async def choose_doctor(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(lambda call: True, state=Appointment.know_doctor)
 async def callback_choose_doctor(call: types.CallbackQuery, state: FSMContext):
-    print(datetime.datetime.now(), await state.get_data("list_state"))
+    print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваш врач: " + call.data)
     await call.answer()
@@ -331,7 +331,7 @@ async def choose_date(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(lambda call: True, state=Appointment.set_doctor)
 async def callback_choose_date(call: types.CallbackQuery, state: FSMContext):
-    print(datetime.datetime.now(), await state.get_data("list_state"))
+    print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваша дата: " + call.data)
     await call.answer()
@@ -360,7 +360,7 @@ async def choose_time(message: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(lambda call: True, state=Appointment.set_date)
 async def callback_choose_time(call: types.CallbackQuery, state: FSMContext):
-    print(datetime.datetime.now(), await state.get_data("list_state"))
+    print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваше время: " + call.data)
     await call.answer()
@@ -409,6 +409,7 @@ async def switch_callback_client_info(call: types.CallbackQuery, state: FSMConte
 
 
 async def accept_client_info(call: types.CallbackQuery, state: FSMContext):
+    database.add_appointment(await state.get_data())
     await call.message.answer("Запись в клинику прошла успешно\nВсего доброго!")
     await call.answer()
     await state.reset_data()
