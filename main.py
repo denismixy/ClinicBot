@@ -69,6 +69,7 @@ async def cancel(message: types.Message, state: FSMContext):
     await start_menu(message, state)
 
 
+# TODO возмоно стоит исправить листы на сеты
 @dp.message_handler(lambda msg: msg.text == "Назад", state="*")
 async def back(message: types.Message, state: FSMContext):
     dictionary: dict = await state.get_data()
@@ -84,6 +85,7 @@ async def back(message: types.Message, state: FSMContext):
     await called_function_name(message, state)
 
 
+# TODO возмоно стоит исправить листы на сеты
 async def update_function_list(state: FSMContext, function_name: str):
     dictionary = await state.get_data()
     list_function = dictionary["list_function"]
@@ -91,6 +93,7 @@ async def update_function_list(state: FSMContext, function_name: str):
     await state.update_data(list_function=list_function)
 
 
+# TODO возмоно стоит исправить листы на сеты
 async def update_state_list(state: FSMContext):
     dictionary = await state.get_data()
     list_state: list = dictionary["list_state"]
@@ -218,6 +221,10 @@ async def dont_know_choose_date(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(lambda call: True, state=Appointment.dont_know_doctor)
 async def dont_know_callback_choose_date(call: types.CallbackQuery, state: FSMContext):
     print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
+    if re.match(r'\d\d\.\d\d', call.data) is None:
+        await call.answer()
+        await dont_know_choose_date(call.message, state)
+        return
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваша дата: " + call.data)
     await call.answer()
@@ -248,6 +255,10 @@ async def dont_know_choose_time(message: types.Message, state: FSMContext):
 async def dont_know_callback_choose_time(call: types.CallbackQuery, state: FSMContext):
     print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
     await call.message.delete_reply_markup()
+    if re.match(r'\d\d:\d\d', call.data) is None:
+        await call.answer()
+        await dont_know_choose_time(call.message, state)
+        return
     await call.message.edit_text("Ваше время: " + call.data)
     await call.answer()
     await state.update_data(time=call.data)
@@ -273,6 +284,10 @@ async def dont_know_choose_doctor(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(lambda call: True, state=Appointment.dont_know_set_time)
 async def dont_know_callback_choose_doctor(call: types.CallbackQuery, state: FSMContext):
     print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
+    if re.match(r'\w*\s\w\.\w\.', call.data) is None:
+        await call.answer()
+        await dont_know_choose_doctor(call.message, state)
+        return
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваш врач: " + call.data)
     await call.answer()
@@ -300,6 +315,10 @@ async def choose_doctor(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(lambda call: True, state=Appointment.know_doctor)
 async def callback_choose_doctor(call: types.CallbackQuery, state: FSMContext):
     print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
+    if re.match(r'\w*\s\w\.\w\.', call.data) is None:
+        await call.answer()
+        await choose_doctor(call.message, state)
+        return
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваш врач: " + call.data)
     await call.answer()
@@ -331,6 +350,10 @@ async def choose_date(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(lambda call: True, state=Appointment.set_doctor)
 async def callback_choose_date(call: types.CallbackQuery, state: FSMContext):
     print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
+    if re.match(r'\d\d\.\d\d', call.data) is None:
+        await call.answer()
+        await dont_know_choose_date(call.message, state)
+        return
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваша дата: " + call.data)
     await call.answer()
@@ -360,6 +383,10 @@ async def choose_time(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(lambda call: True, state=Appointment.set_date)
 async def callback_choose_time(call: types.CallbackQuery, state: FSMContext):
     print(call.from_user.id, datetime.datetime.now(), await state.get_data("list_state"))
+    if re.match(r'\d\d:\d\d', call.data) is None:
+        await call.answer()
+        await choose_time(call.message, state)
+        return
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваше время: " + call.data)
     await call.answer()
@@ -430,7 +457,7 @@ async def request_name(message: types.Message, state: FSMContext):
     name_current_function = request_name
     await update_function_list(state, name_current_function)
     await update_state_list(state)
-    await message.answer("Введите свое ФИО", reply_markup=cancel_keyboard())
+    await message.answer("Введите свое ФИО на русском языке", reply_markup=cancel_keyboard())
     await ClientInfo.ValidateName.set()
 
 
