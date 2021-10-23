@@ -1,5 +1,4 @@
 import re
-import inspect
 import database
 import properties
 from datetime import date
@@ -82,7 +81,7 @@ async def back(message: types.Message, state: FSMContext):
     list_function.pop()
     called_function_name = list_function.pop()
     await state.update_data(list_function=list_function)
-    await eval(f"{called_function_name}(message, state)")
+    await called_function_name(message, state)
 
 
 async def update_function_list(state: FSMContext, function_name: str):
@@ -110,7 +109,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
 async def start_menu(message: types.Message, state: FSMContext):
     await state.update_data(list_state=[])
     await state.update_data(list_function=[])
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = start_menu
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -136,7 +135,7 @@ async def switch_start_menu(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=Menu.show_appointment)
 async def show_appointment(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = show_appointment
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     if not database.check_client_appointment(message.from_user.id):
@@ -166,7 +165,7 @@ async def switch_show_appointment(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=Menu.sign_up)
 async def sign_up(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = sign_up
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     if database.check_client_appointment(message.from_user.id):
@@ -199,7 +198,7 @@ async def switch_sign_up(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=Appointment.dont_know_doctor)
 async def dont_know_choose_date(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = dont_know_choose_date
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     keyboard = types.InlineKeyboardMarkup()
@@ -229,7 +228,7 @@ async def dont_know_callback_choose_date(call: types.CallbackQuery, state: FSMCo
 
 @dp.message_handler(state=Appointment.dont_know_date)
 async def dont_know_choose_time(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = dont_know_choose_time
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     time_keyboard = types.InlineKeyboardMarkup()
@@ -258,7 +257,7 @@ async def dont_know_callback_choose_time(call: types.CallbackQuery, state: FSMCo
 
 @dp.message_handler(state=Appointment.dont_know_set_time)
 async def dont_know_choose_doctor(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = dont_know_choose_doctor
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -285,7 +284,7 @@ async def dont_know_callback_choose_doctor(call: types.CallbackQuery, state: FSM
 
 @dp.message_handler(state=Appointment.know_doctor)
 async def choose_doctor(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = choose_doctor
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -312,7 +311,7 @@ async def callback_choose_doctor(call: types.CallbackQuery, state: FSMContext):
 
 @dp.message_handler(state=Appointment.set_doctor)
 async def choose_date(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = choose_date
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     keyboard = types.InlineKeyboardMarkup()
@@ -342,7 +341,7 @@ async def callback_choose_date(call: types.CallbackQuery, state: FSMContext):
 
 @dp.message_handler(state=Appointment.set_date)
 async def choose_time(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = choose_time
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     time_keyboard = types.InlineKeyboardMarkup()
@@ -379,7 +378,7 @@ async def send_appointment(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=ClientInfo.ShowInfo)
 async def show_client_info(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = show_client_info
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     if database.check_client_info(message.chat.id):
@@ -428,7 +427,7 @@ async def change_client_info(call: types.CallbackQuery, state: FSMContext):
 # Обработка ФИО
 @dp.message_handler(state=ClientInfo.Name)
 async def request_name(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = request_name
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     await message.answer("Введите свое ФИО", reply_markup=cancel_keyboard())
@@ -454,7 +453,7 @@ async def correct_name(message: types.Message, state: FSMContext):
 # Обработка даты рождения
 @dp.message_handler(state=ClientInfo.Birthday)
 async def request_birthday(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = request_birthday
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     await message.answer("Введите дату своего рождения (дд.мм.гггг)", reply_markup=cancel_keyboard())
@@ -501,7 +500,7 @@ async def correct_format_birthday(message: types.Message, state: FSMContext):
 # Обработка телефонного номера
 @dp.message_handler(state=ClientInfo.PhoneNumber)
 async def request_phone(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = request_phone
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     await message.answer("Введите номер телефона", reply_markup=cancel_keyboard())
@@ -528,7 +527,7 @@ async def correct_phone(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=ClientInfo.OtherInfo)
 async def request_info(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = request_info
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     await message.answer("Введите доп. информацию", reply_markup=cancel_keyboard())
@@ -537,7 +536,7 @@ async def request_info(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=ClientInfo.FinallyChecker)
 async def previously_request_info(message: types.Message, state: FSMContext):
-    name_current_function = inspect.currentframe().f_code.co_name
+    name_current_function = previously_request_info
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     await state.update_data(other_info=message.text)
