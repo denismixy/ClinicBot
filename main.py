@@ -69,7 +69,6 @@ async def cancel(message: types.Message, state: FSMContext):
     await start_menu(message, state)
 
 
-# TODO возмоно стоит исправить листы на сеты
 @dp.message_handler(lambda msg: msg.text == "Назад", state="*")
 async def back(message: types.Message, state: FSMContext):
     dictionary: dict = await state.get_data()
@@ -85,19 +84,20 @@ async def back(message: types.Message, state: FSMContext):
     await called_function_name(message, state)
 
 
-# TODO возмоно стоит исправить листы на сеты
 async def update_function_list(state: FSMContext, function_name: str):
     dictionary = await state.get_data()
     list_function = dictionary["list_function"]
-    list_function.append(function_name)
+    if function_name not in list_function:
+        list_function.append(function_name)
     await state.update_data(list_function=list_function)
 
 
-# TODO возмоно стоит исправить листы на сеты
 async def update_state_list(state: FSMContext):
     dictionary = await state.get_data()
     list_state: list = dictionary["list_state"]
-    list_state.append(await state.get_state())
+    state_name = await state.get_state()
+    if state_name not in list_state:
+        list_state.append(await state.get_state())
     await state.update_data(list_state=list_state)
 
 
@@ -405,10 +405,10 @@ async def send_appointment(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=ClientInfo.ShowInfo)
 async def show_client_info(message: types.Message, state: FSMContext):
-    name_current_function = show_client_info
-    await update_function_list(state, name_current_function)
-    await update_state_list(state)
     if database.check_client_info(message.chat.id):
+        name_current_function = show_client_info
+        await update_function_list(state, name_current_function)
+        await update_state_list(state)
         show_info_keyboard = types.InlineKeyboardMarkup(row_width=2)
         buttons = [
             types.InlineKeyboardButton(text="Изменить", callback_data="change_info"),
