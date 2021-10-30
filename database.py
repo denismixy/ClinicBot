@@ -5,10 +5,10 @@ db = pw.SqliteDatabase("clinic.db")
 
 
 class Clients(pw.Model):
-    client_id = pw.IntegerField(primary_key=True, unique=True)
+    tel_num = pw.IntegerField(primary_key=True, unique=True)
+    chat_id = pw.IntegerField()
     name = pw.CharField()
     birthday = pw.DateField()
-    tel_num = pw.IntegerField()
     other_info = pw.CharField()
 
     class Meta:
@@ -24,7 +24,7 @@ class Doctors(pw.Model):
 
 
 class AppointmentsList(pw.Model):
-    client_id = pw.ForeignKeyField(Clients)
+    tel_num = pw.ForeignKeyField(Clients)
     doctor_id = pw.ForeignKeyField(Doctors)
     date_and_time = pw.DateField()
 
@@ -50,64 +50,63 @@ class WeekSchedule(pw.Model):
 
 db.connect()
 
-
 # db.drop_tables([Clients, Doctors, AppointmentsList, Holidays, WeekSchedule])
 # db.create_tables([Clients, Doctors, AppointmentsList, Holidays, WeekSchedule])
 
 
 # add client into DB
 def add_client(person) -> None:
-    Clients.create(client_id=person["client_id"],
+    Clients.create(tel_num=person["tel_num"],
+                   chat_id=person["chat_id"],
                    name=person["name"],
                    birthday=person["birthday"],
-                   tel_num=person["tel_num"],
                    other_info=person["other_info"])
 
 
-def del_client(person_id) -> None:
-    Clients.delete_by_id(person_id)
+def del_client(tel_num) -> None:
+    Clients.delete_by_id(tel_num)
 
 
-#TODO: сделать изменение значения в поле клиента
+# TODO: сделать изменение значения в поле клиента
 def update_client(person_id, field, value) -> None:
-    Clients.update(field = value).where(Clients.client_id == person_id)
+    Clients.update(field=value).where(Clients.client_id == person_id)
 
 
 def add_appointment(note) -> None:
-    AppointmentsList.create(client_id=note["client_id"],
+    AppointmentsList.create(tel_num=note["tel_num"],
                             doctor_id=Doctors.get(Doctors.name == note["doctor"]),
                             date_and_time=note["date"] + " " + note["time"])
 
 
-def del_appointment(client_id) -> None:
+def del_appointment(tel_num) -> None:
     try:
-        note_id = AppointmentsList.get(AppointmentsList.client_id == client_id)
+        note_id = AppointmentsList.get(AppointmentsList.tel_num == tel_num)
         AppointmentsList.delete_by_id(note_id.id)
     except Exception:
         return
 
 
-def check_client_info(id: int) -> bool:
+def check_client_info(tel_num: int) -> bool:
     try:
-        Clients.get(Clients.client_id == id)
+        Clients.get(Clients.tel_num == tel_num)
         return True
     except Exception:
         return False
 
 
-def check_client_appointment(id: int) -> bool:
+def check_client_appointment(tel_num: int) -> bool:
     try:
-        AppointmentsList.get(AppointmentsList.client_id == id)
-        Clients.get(Clients.client_id == id)
+        AppointmentsList.get(AppointmentsList.tel_num == tel_num)
+        Clients.get(Clients.tel_num == tel_num)
         return True
     except Exception:
-        del_appointment(id)
+        del_appointment(tel_num)
         return False
 
 
 # show client info
-def show_client_info(id: int) -> str:
-    client = Clients.get(Clients.client_id == id)
+def show_client_info(tel_num: int) -> str:
+    client = Clients.get(Clients.tel_num == tel_num)
     output = ""
     output += f"Ваше имя: {client.name}\n"
     output += f"Ваша дата рождения: {client.birthday}\n"
@@ -116,10 +115,10 @@ def show_client_info(id: int) -> str:
     return output
 
 
-def show_client_appointment(id: int) -> str:
+def show_client_appointment(tel_num: int) -> str:
     try:
-        note = AppointmentsList.get(AppointmentsList.client_id == id)
-        client = Clients.get(Clients.client_id == note.client_id)
+        note = AppointmentsList.get(AppointmentsList.tel_num == tel_num)
+        client = Clients.get(Clients.tel_num == note.tel_num)
         doctor = Doctors.get(Doctors.doctor_id == note.doctor_id)
         output = ""
         output += f"Ваше имя: {client.name}\n"
@@ -139,3 +138,24 @@ def show_doctors() -> list:
 
     except Exception:
         logging.error("Упало обращение к таблице докторов")
+
+
+# TODO добавить админов
+def check_access(chat_id, tel_num):
+    try:
+        print(chat_id, tel_num)
+        print(Clients.get(tel_num).chat_id)
+        if Clients.get(Clients.tel_num == tel_num).chat_id == chat_id:
+            return True
+        else:
+            return False
+    except Exception:
+        return False
+
+
+def get_number_by_date_time(date, time, doctor):
+    date_time = date + " " + time
+    try:
+        return AppointmentsList.get((AppointmentsList.date_and_time == date_time) and (AppointmentsList.doctor_id == Doctors.get(Doctors.name == doctor))).tel_num
+    except Exception:
+        return None

@@ -21,9 +21,13 @@ dp: Dispatcher = Dispatcher(bot, storage=storage)
 class Menu(StatesGroup):
     start_menu = State()
     keyboard_menu = State()
+    check_appointment = State()
+    switch_check_appointment = State()
     sign_up = State()
     switch_sign_up = State()
     show_appointment = State()
+    choice_search_method = State()
+    switch_choice_search_method = State()
     switch_show_appointment = State()
     choose_doctor = State()
 
@@ -64,7 +68,6 @@ def cancel_keyboard():
 
 @dp.message_handler(lambda msg: msg.text == "Отмена", state="*")
 async def cancel(message: types.Message, state: FSMContext):
-    database.check_client_appointment(message.from_user.id)
     await Menu.start_menu.set()
     await start_menu(message, state)
 
@@ -80,6 +83,8 @@ async def back(message: types.Message, state: FSMContext):
     list_function: list = dictionary["list_function"]
     list_function.pop()
     called_function_name = list_function.pop()
+    if "Menu:choice_search_method" in list_state:
+        await state.update_data(tel_num="click on back button")
     await state.update_data(list_function=list_function)
     await called_function_name(message, state)
 
@@ -110,6 +115,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=Menu.start_menu)
 async def start_menu(message: types.Message, state: FSMContext):
+    await state.reset_data()
     await state.update_data(list_state=[])
     await state.update_data(list_function=[])
     name_current_function = start_menu
@@ -117,7 +123,7 @@ async def start_menu(message: types.Message, state: FSMContext):
     await update_state_list(state)
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     buttons = [
-        types.KeyboardButton("Хочу записаться", ),
+        types.KeyboardButton("Хочу записаться"),
         types.KeyboardButton("Посмотреть запись")
     ]
     keyboard.add(*buttons)
@@ -129,9 +135,78 @@ async def start_menu(message: types.Message, state: FSMContext):
 async def switch_start_menu(message: types.Message, state: FSMContext):
     print(message.chat.id, datetime.datetime.now(), await state.get_data("list_state"))
     if message.text == "Хочу записаться":
+        await state.update_data(choice_start_menu="Хочу записаться")
+        await ClientInfo.PhoneNumber.set()
+        await request_phone(message, state)
+    elif message.text == "Посмотреть запись":
+        await state.update_data(choice_start_menu="Посмотреть запись")
+        # TODO провервка на админа
+        if True:
+            await Menu.choice_search_method.set()
+            await choice_search_method(message, state)
+            return
+        else:
+            await ClientInfo.PhoneNumber.set()
+            await request_phone(message, state)
+
+
+@dp.message_handler(state=Menu.choice_search_method)
+async def choice_search_method(message: types.Message, state: FSMContext):
+    print(message.chat.id, datetime.datetime.now(), await state.get_data("list_state"))
+    name_current_function = choice_search_method
+    await update_function_list(state, name_current_function)
+    await update_state_list(state)
+    keyboard = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, one_time_keyboard=True)
+    buttons = [
+        types.KeyboardButton("Поиск по номеру"),
+        types.KeyboardButton("Поиск по дате"),
+        types.KeyboardButton("Назад"),
+        types.KeyboardButton("Отмена")
+    ]
+    keyboard.add(*buttons)
+    await Menu.switch_choice_search_method.set()
+    await message.answer("Выберите действие", reply_markup=keyboard)
+
+
+@dp.message_handler(state=Menu.switch_choice_search_method)
+async def switch_choice_search_method(message: types.Message, state: FSMContext):
+    if message.text == "Поиск по номеру":
+        await ClientInfo.PhoneNumber.set()
+        await request_phone(message, state)
+    else:
         await Menu.sign_up.set()
         await sign_up(message, state)
-    elif message.text == "Посмотреть запись":
+
+
+# Обработка телефонного номера
+@dp.message_handler(state=ClientInfo.PhoneNumber)
+async def request_phone(message: types.Message, state: FSMContext):
+    name_current_function = request_phone
+    await update_function_list(state, name_current_function)
+    await update_state_list(state)
+    await message.answer("Введите номер телефона", reply_markup=cancel_keyboard())
+    await ClientInfo.ValidateNumber.set()
+
+
+@dp.message_handler(lambda message: re.match(r'^(\+7|7|8)\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$',
+                                             message.text) is None,
+                    state=ClientInfo.ValidateNumber)
+async def wrong_phone(message: types.Message, state: FSMContext):
+    await message.answer("Некорректный ввод номера телефона")
+    await ClientInfo.PhoneNumber.set()
+    await request_phone(message, state)
+
+
+@dp.message_handler(lambda message: re.match(r'^(\+7|7|8)\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$',
+                                             message.text) is not None,
+                    state=ClientInfo.ValidateNumber)
+async def correct_phone(message: types.Message, state: FSMContext):
+    await state.update_data(tel_num=message.text)
+    dictionary: dir = await state.get_data()
+    if dictionary["choice_start_menu"] == "Хочу записаться":
+        await Menu.check_appointment.set()
+        await check_appointment(message, state)
+    else:
         await Menu.show_appointment.set()
         await show_appointment(message, state)
 
@@ -141,7 +216,8 @@ async def show_appointment(message: types.Message, state: FSMContext):
     name_current_function = show_appointment
     await update_function_list(state, name_current_function)
     await update_state_list(state)
-    if not database.check_client_appointment(message.from_user.id):
+    dictionary: dict = await state.get_data()
+    if not database.check_client_appointment(dictionary["tel_num"]):
         await message.answer("Вы не записывались в клинику")
         await Menu.start_menu.set()
         await start_menu(message, state)
@@ -152,18 +228,53 @@ async def show_appointment(message: types.Message, state: FSMContext):
         types.KeyboardButton(text=Keys.back)
     ]
     keyboard.add(*buttons)
-    await message.answer(database.show_client_appointment(message.from_user.id), reply_markup=keyboard)
+    await message.answer(database.show_client_appointment(dictionary["tel_num"]), reply_markup=keyboard)
     await Menu.switch_show_appointment.set()
 
 
 @dp.message_handler(state=Menu.switch_show_appointment)
 async def switch_show_appointment(message: types.Message, state: FSMContext):
     print(message.chat.id, datetime.datetime.now(), await state.get_data("list_state"))
-    if message.text == "Удалить запись":
-        database.del_appointment(message.from_user.id)
+    dictionary: dict = await state.get_data()
+    if message.text == "Удалить запись" and database.check_access(message.chat.id, dictionary["tel_num"]):
+        database.del_appointment(dictionary["tel_num"])
         await message.answer("Запись успешно удалена")
+    else:
+        await message.answer("У вас недостаточно прав для удаления этой записи")
     await Menu.start_menu.set()
     await start_menu(message, state)
+
+
+@dp.message_handler(state=Menu.check_appointment)
+async def check_appointment(message: types.Message, state: FSMContext):
+    dictionary: dict = await state.get_data()
+    if not database.check_client_appointment(dictionary["tel_num"]):
+        await Menu.sign_up.set()
+        await sign_up(message, state)
+    else:
+        name_current_function = check_appointment
+        await update_function_list(state, name_current_function)
+        await update_state_list(state)
+        keyboard = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+        buttons = [
+            types.KeyboardButton(text="Хочу перезаписаться"),
+            types.KeyboardButton(text="Назад")
+        ]
+        keyboard.add(*buttons)
+        await Menu.switch_check_appointment.set()
+        await message.answer("Вы уже записаны", reply_markup=keyboard)
+
+
+@dp.message_handler(state=Menu.switch_check_appointment)
+async def switch_check_appointment(message: types.Message, state: FSMContext):
+    dictionary: dict = await state.get_data()
+    if message.text == "Хочу перезаписаться" and database.check_access(message.chat.id, dictionary["tel_num"]):
+        await Menu.sign_up.set()
+        await sign_up(message, state)
+    else:
+        await message.answer("У вас недостаточно прав для удаления этой записи")
+        await Menu.start_menu.set()
+        await start_menu(message, state)
 
 
 @dp.message_handler(state=Menu.sign_up)
@@ -171,11 +282,6 @@ async def sign_up(message: types.Message, state: FSMContext):
     name_current_function = sign_up
     await update_function_list(state, name_current_function)
     await update_state_list(state)
-    if database.check_client_appointment(message.from_user.id):
-        await message.answer("Вы уже записаны")
-        await Menu.start_menu.set()
-        await start_menu(message, state)
-        return
     keyboard = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     buttons = [
         types.KeyboardButton(text="Я знаю врача"),
@@ -291,7 +397,7 @@ async def dont_know_callback_choose_doctor(call: types.CallbackQuery, state: FSM
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваш врач: " + call.data)
     await call.answer()
-    await state.update_data(client_id=call.from_user.id)
+    await state.update_data(chat_id=call.from_user.id)
     await state.update_data(doctor=call.data)
     await Appointment.set_time.set()
     await send_appointment(call.message, state)
@@ -322,7 +428,7 @@ async def callback_choose_doctor(call: types.CallbackQuery, state: FSMContext):
     await call.message.delete_reply_markup()
     await call.message.edit_text("Ваш врач: " + call.data)
     await call.answer()
-    await state.update_data(client_id=call.from_user.id)
+    await state.update_data(chat_id=call.from_user.id)
     await state.update_data(doctor=call.data)
     await Appointment.set_doctor.set()
     await choose_date(call.message, state)
@@ -405,7 +511,16 @@ async def send_appointment(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=ClientInfo.ShowInfo)
 async def show_client_info(message: types.Message, state: FSMContext):
-    if database.check_client_info(message.chat.id):
+    dictionary: dict = await state.get_data()
+    try:
+        tel_num = dictionary["tel_num"]
+        if tel_num == "click on back button":
+            raise KeyError
+    except KeyError:
+        tel_num = database.get_number_by_date_time(dictionary["date"], dictionary["time"], dictionary["doctor"])
+        await state.update_data(tel_num=tel_num)
+
+    if tel_num is not None:
         name_current_function = show_client_info
         await update_function_list(state, name_current_function)
         await update_state_list(state)
@@ -414,16 +529,29 @@ async def show_client_info(message: types.Message, state: FSMContext):
             types.InlineKeyboardButton(text="Изменить", callback_data="change_info"),
             types.InlineKeyboardButton(text="Принять", callback_data="accept_info")
         ]
+        if "Menu:choice_search_method" in dictionary["list_state"]:
+            buttons = [
+                types.InlineKeyboardButton(text="Удалить", callback_data="delete_info")
+            ]
         show_info_keyboard.add(*buttons)
-        await message.answer("Вы уже вводили свои данные\nПроверьте их правильность")
-        await message.answer(database.show_client_info(message.chat.id), reply_markup=show_info_keyboard)
+        await message.answer("Данные уже введены, проверьте их правильность")
+        await message.answer(database.show_client_info(tel_num), reply_markup=show_info_keyboard)
     else:
+        if "Menu:choice_search_method" in dictionary["list_state"]:
+            name_current_function = show_client_info
+            await update_function_list(state, name_current_function)
+            await update_state_list(state)
+            await message.answer("Запись не найдена, попробуйте еще раз")
+            await Menu.choice_search_method.set()
+            await choice_search_method(message, state)
+            return
         await ClientInfo.Name.set()
         await request_name(message, state)
 
 
 @dp.callback_query_handler(lambda call: True, state=ClientInfo.ShowInfo)
 async def switch_callback_client_info(call: types.CallbackQuery, state: FSMContext):
+    dictionary: dict = await state.get_data()
     await call.message.delete_reply_markup()
     if call.data == "accept_info":
         await ClientInfo.AcceptInfo.set()
@@ -432,6 +560,15 @@ async def switch_callback_client_info(call: types.CallbackQuery, state: FSMConte
         await call.message.delete()
         await ClientInfo.ChangeInfo.set()
         await change_client_info(call, state)
+    elif call.data == "delete_info":
+        tel_num = database.get_number_by_date_time(dictionary["date"], dictionary["time"], dictionary["doctor"])
+        if tel_num is not None:
+            database.del_appointment(tel_num)
+            await call.message.answer("Запись удалена")
+        else:
+            await call.message.answer("Не удалось удалить, попробуйте еще раз")
+        await Menu.start_menu.set()
+        await start_menu(call.message, state)
 
 
 async def accept_client_info(call: types.CallbackQuery, state: FSMContext):
@@ -443,7 +580,6 @@ async def accept_client_info(call: types.CallbackQuery, state: FSMContext):
     await start_menu(call.message, state)
 
 
-# TODO: Сделать выбор для изменения конкретного поля Клиента
 async def change_client_info(call: types.CallbackQuery, state: FSMContext):
     await call.message.answer("Давайте обновим ваши данные📝")
     await call.answer()
@@ -472,7 +608,7 @@ async def wrong_name(message: types.Message, state: FSMContext):
 @dp.message_handler(lambda message: re.match(r'^[а-яА-Я]+((\s|-)?[а-яА-Я]+)*$', message.text) is not None,
                     state=ClientInfo.ValidateName)
 async def correct_name(message: types.Message, state: FSMContext):
-    await state.update_data(client_id=message.from_user.id, name=message.text)
+    await state.update_data(chat_id=message.from_user.id, name=message.text)
     await ClientInfo.Birthday.set()
     await request_birthday(message, state)
 
@@ -520,34 +656,6 @@ async def correct_format_birthday(message: types.Message, state: FSMContext):
         return
 
     await state.update_data(birthday=message.text)
-    await ClientInfo.PhoneNumber.set()
-    await request_phone(message, state)
-
-
-# Обработка телефонного номера
-@dp.message_handler(state=ClientInfo.PhoneNumber)
-async def request_phone(message: types.Message, state: FSMContext):
-    name_current_function = request_phone
-    await update_function_list(state, name_current_function)
-    await update_state_list(state)
-    await message.answer("Введите номер телефона", reply_markup=cancel_keyboard())
-    await ClientInfo.ValidateNumber.set()
-
-
-@dp.message_handler(lambda message: re.match(r'^(\+7|7|8)\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$',
-                                             message.text) is None,
-                    state=ClientInfo.ValidateNumber)
-async def wrong_phone(message: types.Message, state: FSMContext):
-    await message.answer("Некорректный ввод номера телефона")
-    await ClientInfo.PhoneNumber.set()
-    await request_phone(message, state)
-
-
-@dp.message_handler(lambda message: re.match(r'^(\+7|7|8)\s?(\(\s?\d{3}\s?\)|\d{3})\s?\d{7}$',
-                                             message.text) is not None,
-                    state=ClientInfo.ValidateNumber)
-async def correct_phone(message: types.Message, state: FSMContext):
-    await state.update_data(tel_num=message.text)
     await ClientInfo.OtherInfo.set()
     await request_info(message, state)
 
@@ -593,7 +701,9 @@ async def switch_request_info(message: types.Message, state: FSMContext):
 async def get_info(message: types.Message, state: FSMContext):
     await message.answer("Запись в клинику прошла успешно\n"
                          "Всего доброго!")
-    database.del_client(message.chat.id)
+    dictionary: dict = await state.get_data()
+    database.del_client(dictionary["tel_num"])
+    database.del_appointment(dictionary["tel_num"])
     database.add_client(await state.get_data())
     database.add_appointment(await state.get_data())
     await state.reset_data()
