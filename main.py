@@ -520,7 +520,7 @@ async def show_client_info(message: types.Message, state: FSMContext):
         tel_num = database.get_number_by_date_time(dictionary["date"], dictionary["time"], dictionary["doctor"])
         await state.update_data(tel_num=tel_num)
 
-    if tel_num is not None:
+    if tel_num is not None and database.check_client_info(tel_num):
         name_current_function = show_client_info
         await update_function_list(state, name_current_function)
         await update_state_list(state)
