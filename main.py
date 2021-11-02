@@ -123,7 +123,7 @@ async def start_menu(message: types.Message, state: FSMContext):
     await update_state_list(state)
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     buttons = [
-        types.KeyboardButton("Хочу записаться"),
+        types.KeyboardButton("Записаться к врачу"),
         types.KeyboardButton("Посмотреть запись")
     ]
     keyboard.add(*buttons)
@@ -134,8 +134,8 @@ async def start_menu(message: types.Message, state: FSMContext):
 @dp.message_handler(state=Menu.keyboard_menu)
 async def switch_start_menu(message: types.Message, state: FSMContext):
     print(message.chat.id, datetime.datetime.now(), await state.get_data("list_state"))
-    if message.text == "Хочу записаться":
-        await state.update_data(choice_start_menu="Хочу записаться")
+    if message.text == "Записаться к врачу":
+        await state.update_data(choice_start_menu="Записаться к врачу")
         await ClientInfo.PhoneNumber.set()
         await request_phone(message, state)
     elif message.text == "Посмотреть запись":
@@ -203,7 +203,7 @@ async def wrong_phone(message: types.Message, state: FSMContext):
 async def correct_phone(message: types.Message, state: FSMContext):
     await state.update_data(tel_num=message.text)
     dictionary: dir = await state.get_data()
-    if dictionary["choice_start_menu"] == "Хочу записаться":
+    if dictionary["choice_start_menu"] == "Записаться к врачу":
         await Menu.check_appointment.set()
         await check_appointment(message, state)
     else:
@@ -332,7 +332,7 @@ async def dont_know_callback_choose_date(call: types.CallbackQuery, state: FSMCo
         await dont_know_choose_date(call.message, state)
         return
     await call.message.delete_reply_markup()
-    await call.message.edit_text("Ваша дата: " + call.data)
+    await call.message.edit_text("Дата записи: " + call.data)
     await call.answer()
     await state.update_data(date=call.data)
     await Appointment.dont_know_date.set()
@@ -365,7 +365,7 @@ async def dont_know_callback_choose_time(call: types.CallbackQuery, state: FSMCo
         await call.answer()
         await dont_know_choose_time(call.message, state)
         return
-    await call.message.edit_text("Ваше время: " + call.data)
+    await call.message.edit_text("Выбранное время: " + call.data)
     await call.answer()
     await state.update_data(time=call.data)
     await Appointment.dont_know_set_time.set()
@@ -395,7 +395,7 @@ async def dont_know_callback_choose_doctor(call: types.CallbackQuery, state: FSM
         await dont_know_choose_doctor(call.message, state)
         return
     await call.message.delete_reply_markup()
-    await call.message.edit_text("Ваш врач: " + call.data)
+    await call.message.edit_text("Врач: " + call.data)
     await call.answer()
     await state.update_data(chat_id=call.from_user.id)
     await state.update_data(doctor=call.data)
@@ -415,7 +415,7 @@ async def choose_doctor(message: types.Message, state: FSMContext):
         buttons.append(types.InlineKeyboardButton(text=doctor, callback_data=doctor))
     keyboard.add(*buttons)
     await message.answer("👨‍⚕👩‍⚕", reply_markup=cancel_keyboard())
-    await message.answer("Выберите своего врача", reply_markup=keyboard)
+    await message.answer("Выберите врача", reply_markup=keyboard)
 
 
 @dp.callback_query_handler(lambda call: True, state=Appointment.know_doctor)
@@ -426,7 +426,7 @@ async def callback_choose_doctor(call: types.CallbackQuery, state: FSMContext):
         await choose_doctor(call.message, state)
         return
     await call.message.delete_reply_markup()
-    await call.message.edit_text("Ваш врач: " + call.data)
+    await call.message.edit_text("Врач: " + call.data)
     await call.answer()
     await state.update_data(chat_id=call.from_user.id)
     await state.update_data(doctor=call.data)
@@ -461,7 +461,7 @@ async def callback_choose_date(call: types.CallbackQuery, state: FSMContext):
         await dont_know_choose_date(call.message, state)
         return
     await call.message.delete_reply_markup()
-    await call.message.edit_text("Ваша дата: " + call.data)
+    await call.message.edit_text("Дата записи: " + call.data)
     await call.answer()
     await state.update_data(date=call.data)
     await Appointment.set_date.set()
@@ -494,7 +494,7 @@ async def callback_choose_time(call: types.CallbackQuery, state: FSMContext):
         await choose_time(call.message, state)
         return
     await call.message.delete_reply_markup()
-    await call.message.edit_text("Ваше время: " + call.data)
+    await call.message.edit_text("Выбранное время: " + call.data)
     await call.answer()
     await state.update_data(time=call.data)
     await Appointment.set_time.set()
@@ -534,7 +534,7 @@ async def show_client_info(message: types.Message, state: FSMContext):
                 types.InlineKeyboardButton(text="Удалить", callback_data="delete_info")
             ]
         show_info_keyboard.add(*buttons)
-        await message.answer("Данные уже введены, проверьте их правильность")
+        await message.answer("Персональные данные уже были введены ранее, проверьте их правильность")
         await message.answer(database.show_client_info(tel_num), reply_markup=show_info_keyboard)
     else:
         if "Menu:choice_search_method" in dictionary["list_state"]:
@@ -581,7 +581,7 @@ async def accept_client_info(call: types.CallbackQuery, state: FSMContext):
 
 
 async def change_client_info(call: types.CallbackQuery, state: FSMContext):
-    await call.message.answer("Давайте обновим ваши данные📝")
+    await call.message.answer("Давайте обновим данные📝")
     await call.answer()
     await ClientInfo.Name.set()
     await request_name(call.message, state)
@@ -684,9 +684,9 @@ async def previously_request_info(message: types.Message, state: FSMContext):
     keyboard.add(*buttons)
     dictionary = await state.get_data()
     await ClientInfo.SwitchOtherInfo.set()
-    await message.answer(f"Ваше ФИО: {dictionary['name']}\n"
-                         f"Ваш день рождения: {dictionary['birthday']}\n"
-                         f"Ваш телефонный номер: {dictionary['tel_num']}\n"
+    await message.answer(f"ФИО: {dictionary['name']}\n"
+                         f"День рождения: {dictionary['birthday']}\n"
+                         f"Телефонный номер: {dictionary['tel_num']}\n"
                          f"Дополнительная информация: {dictionary['other_info']}\n", reply_markup=keyboard)
 
 
