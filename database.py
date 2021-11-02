@@ -156,6 +156,6 @@ def check_access(chat_id, tel_num):
 def get_number_by_date_time(date, time, doctor):
     date_time = date + " " + time
     try:
-        return AppointmentsList.get((AppointmentsList.date_and_time == date_time) and (AppointmentsList.doctor_id == Doctors.get(Doctors.name == doctor))).tel_num
+        return AppointmentsList.get((AppointmentsList.date_and_time == date_time), (AppointmentsList.doctor_id == Doctors.get(Doctors.name == doctor))).tel_num
     except Exception:
         return None
