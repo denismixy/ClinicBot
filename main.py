@@ -312,12 +312,8 @@ async def dont_know_choose_date(message: types.Message, state: FSMContext):
     await update_state_list(state)
     keyboard = types.InlineKeyboardMarkup()
     buttons = [
-        types.InlineKeyboardButton(text="01.10", callback_data="01.10"),
-        types.InlineKeyboardButton(text="02.10", callback_data="02.10"),
-        types.InlineKeyboardButton(text="03.10", callback_data="03.10"),
-        types.InlineKeyboardButton(text="04.10", callback_data="04.10"),
-        types.InlineKeyboardButton(text="05.10", callback_data="05.10"),
-        types.InlineKeyboardButton(text="06.10", callback_data="06.10")
+        types.InlineKeyboardButton(text=dt.strftime('%d.%m'), callback_data=dt.strftime('%d.%m.%Y'))
+        for dt in database.get_appointments()
     ]
     keyboard.add(*buttons)
     await message.answer("📅", reply_markup=cancel_keyboard())
@@ -345,6 +341,7 @@ async def dont_know_choose_time(message: types.Message, state: FSMContext):
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     time_keyboard = types.InlineKeyboardMarkup()
+    # <- TODO
     buttons = [
         types.InlineKeyboardButton(text="00:00", callback_data="00:00"),
         types.InlineKeyboardButton(text="01:00", callback_data="01:00"),
@@ -440,13 +437,10 @@ async def choose_date(message: types.Message, state: FSMContext):
     await update_function_list(state, name_current_function)
     await update_state_list(state)
     keyboard = types.InlineKeyboardMarkup()
+    # <- TODO
     buttons = [
-        types.InlineKeyboardButton(text="01.10", callback_data="01.10"),
-        types.InlineKeyboardButton(text="02.10", callback_data="02.10"),
-        types.InlineKeyboardButton(text="03.10", callback_data="03.10"),
-        types.InlineKeyboardButton(text="04.10", callback_data="04.10"),
-        types.InlineKeyboardButton(text="05.10", callback_data="05.10"),
-        types.InlineKeyboardButton(text="06.10", callback_data="06.10")
+        types.InlineKeyboardButton(text=dt.strftime('%d.%m'), callback_data=dt.strftime('%d.%m.%Y'))
+        for dt in database.get_appointments()
     ]
     keyboard.add(*buttons)
     await message.answer("📅", reply_markup=cancel_keyboard())

@@ -1,7 +1,15 @@
 import logging
 import peewee as pw
 
+from datetime import date, datetime, timedelta
+
 db = pw.SqliteDatabase("clinic.db")
+
+class Admins(pw.Model):
+    chat_id = pw.IntegerField()
+
+    class Meta:
+        database = db
 
 
 class Clients(pw.Model):
@@ -26,7 +34,8 @@ class Doctors(pw.Model):
 class AppointmentsList(pw.Model):
     tel_num = pw.ForeignKeyField(Clients)
     doctor_id = pw.ForeignKeyField(Doctors)
-    date_and_time = pw.DateField()
+    date = pw.DateField()
+    time = pw.CharField()
 
     class Meta:
         database = db
@@ -41,6 +50,7 @@ class Holidays(pw.Model):
 
 
 class WeekSchedule(pw.Model):
+    # 0 - Понедельник и т. д.
     day = pw.CharField()
     time = pw.CharField()
 
@@ -68,14 +78,15 @@ def del_client(tel_num) -> None:
 
 
 # TODO: сделать изменение значения в поле клиента
-def update_client(person_id, field, value) -> None:
-    Clients.update(field=value).where(Clients.client_id == person_id)
+# def update_client(person_id, field_bd, value) -> None:
+#     Clients.update(field=value).where(Clients.client_id == person_id)
 
 
 def add_appointment(note) -> None:
     AppointmentsList.create(tel_num=note["tel_num"],
                             doctor_id=Doctors.get(Doctors.name == note["doctor"]),
-                            date_and_time=note["date"] + " " + note["time"])
+                            date=note["date"],
+                            time=note["time"])
 
 
 def del_appointment(tel_num) -> None:
@@ -107,12 +118,10 @@ def check_client_appointment(tel_num: int) -> bool:
 # show client info
 def show_client_info(tel_num: int) -> str:
     client = Clients.get(Clients.tel_num == tel_num)
-    output = ""
-    output += f"Ваше имя: {client.name}\n"
-    output += f"Ваша дата рождения: {client.birthday}\n"
-    output += f"Ваш телефон: {client.tel_num}\n"
-    output += f"Доп. инфо: {client.other_info}"
-    return output
+    return  f"Ваше имя: {client.name}\n"\
+            f"Ваша дата рождения: {client.birthday}\n" \
+            f"Ваш телефон: {client.tel_num}\n" \
+            f"Доп. инфо: {client.other_info}"
 
 
 def show_client_appointment(tel_num: int) -> str:
@@ -120,24 +129,34 @@ def show_client_appointment(tel_num: int) -> str:
         note = AppointmentsList.get(AppointmentsList.tel_num == tel_num)
         client = Clients.get(Clients.tel_num == note.tel_num)
         doctor = Doctors.get(Doctors.doctor_id == note.doctor_id)
-        output = ""
-        output += f"Ваше имя: {client.name}\n"
-        output += f"Ваш врач: {doctor.name}\n"
-        output += f"Ваше время: {note.date_and_time}"
-        return output
-    except Exception:
+        return f"ФИО: {client.name}\n" \
+               f"Врач: {doctor.name}\n" \
+               f"Выбранная время: {str(note.time) + ' ' + datetime.strftime(note.date, '%d.%m.%Y')}"
+    except Exception as exc:
         return ''
 
 
 def show_doctors() -> list:
-    output = []
     try:
-        for doctor in Doctors.select():
-            output.append(doctor.name)
-        return output
-
+        return [doctor.name for doctor in Doctors.select()]
     except Exception:
         logging.error("Упало обращение к таблице докторов")
+        return []
+
+
+def get_appointments(amount_weeks: int = 4) -> list:
+    first_day: date = date.today()
+    last_day: date = date.today() + timedelta(amount_weeks * 7)
+    try:
+        dates = [first_day + timedelta(i) for i in range(0, amount_weeks * 7 + 1)]
+        weekdays_schedule = {datetime.strftime(i.day, "%d.%m.%Y"): i.time
+                             for i in WeekSchedule.get()}
+        holidays = {datetime.strftime(i.date, "%d.%m.%Y")
+                    for i in Holidays.get(Holidays.date <= last_day.strftime("%d.%m.%Y"),
+                                                 Holidays.date >= first_day.strftime("%d.%m.&Y"))}
+        return [dt for dt in dates if dt not in holidays and weekdays_schedule[dt.strftime("%d.%m.%Y")]]
+    except Exception as exc:
+        return []
 
 
 # TODO добавить админов
@@ -152,10 +171,18 @@ def check_access(chat_id, tel_num):
     except Exception:
         return False
 
+def check_admin(chat_id):
+    try:
+        Admins.get(Admins.chat_id == chat_id)
+        return True
+    except Exception as exc:
+        return False
 
 def get_number_by_date_time(date, time, doctor):
     date_time = date + " " + time
     try:
-        return AppointmentsList.get((AppointmentsList.date_and_time == date_time), (AppointmentsList.doctor_id == Doctors.get(Doctors.name == doctor))).tel_num
+        return AppointmentsList.get(AppointmentsList.date_and_time == date_time,
+                                    AppointmentsList.doctor_id == Doctors.get(Doctors.name == doctor)
+                                    ).tel_num
     except Exception:
         return None
