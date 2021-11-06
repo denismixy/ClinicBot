@@ -1,4 +1,4 @@
-from tables import Client, Employee
+from logic.database.tables import Client, Employee
 
 
 def check_employee(identify: str) -> bool:

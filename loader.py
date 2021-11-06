@@ -6,3 +6,4 @@ prp: Properties = Properties("properties.json")
 bot: Bot = Bot(token=prp.get_property("token"), parse_mode=types.ParseMode.HTML)
 storage: MemoryStorage = MemoryStorage()
 dp: Dispatcher = Dispatcher(bot, storage=storage)
+

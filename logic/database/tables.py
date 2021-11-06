@@ -1,5 +1,5 @@
 import peewee as pw
-from database import db
+from logic.database.database import db
 
 
 class Client(pw.Model):
@@ -21,3 +21,5 @@ class Employee(pw.Model):
     phone = pw.CharField()
     full_name = pw.CharField()
 
+
+db.create_tables([Client, Employee])

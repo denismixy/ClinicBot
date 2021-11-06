@@ -1,1 +1,1 @@
-from . import tables
+from . import database, checkers, tables
